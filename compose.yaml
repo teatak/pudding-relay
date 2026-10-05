@@ -1,0 +1,14 @@
+services:
+  relay:
+    build:
+      context: .
+    image: pudding-relay:local
+    ports:
+      - "127.0.0.1:${PUDDING_RELAY_PORT:-8080}:8080"
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 10s
