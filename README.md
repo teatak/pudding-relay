@@ -32,7 +32,7 @@ The mobile first release covers conversations, streaming, attachments, cancellat
 
 ## One-command installation
 
-The installer and container checks are implemented. The bundled public image is awaiting publication approval; the command below becomes usable once `teatak/pudding-relay:latest` is published.
+The public [Docker Hub image](https://hub.docker.com/r/teatak/pudding-relay) includes the browser UI and supports Linux amd64/arm64.
 
 Install Docker Engine and Docker Compose v2, then run on the server:
 

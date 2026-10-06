@@ -32,7 +32,7 @@ Pudding 支持两个可独立启用、同时使用的入口：
 
 ## 一键安装
 
-安装器及容器验收已完成。含浏览器资源的公开镜像正在等待发布确认；`teatak/pudding-relay:latest` 发布后，下方命令即可直接使用。
+公开的 [Docker Hub 镜像](https://hub.docker.com/r/teatak/pudding-relay)已包含浏览器界面，支持 Linux amd64／arm64。
 
 先安装 Docker Engine 和 Docker Compose v2，然后在服务器运行：
 
