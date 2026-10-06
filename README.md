@@ -45,7 +45,7 @@ HTTP is permitted only for an explicitly opted-in loopback test origin. Public d
 | `--allow-insecure-loopback` | Explicit HTTP loopback test opt-in |
 | `PUDDING_RELAY_ADMIN_SECRET_FILE` | Required admin secret file, at least 32 bytes after trimming |
 
-`make build` produces `bin/pudding-relay` and embeds the Git commit; `VERSION` and `COMMIT` can override build metadata. `--version` prints it without requiring server configuration. SIGINT/SIGTERM closes tunnels, wakes active streams and shuts down HTTP. The registry is atomically replaced with mode `0600` in a newly created `0700` directory. Back it up securely; lost credentials must be revoked and recreated.
+`make build` produces `bin/pudding-relay` and embeds the Git commit; `VERSION` and `COMMIT` can override build metadata. `--version` prints it without requiring server configuration. SIGINT/SIGTERM closes tunnels, wakes active streams and shuts down HTTP. The registry is atomically replaced; POSIX systems use file mode `0600` and newly created directory mode `0700`. Windows uses the data directory’s ACL permissions. Back it up securely; lost credentials must be revoked and recreated.
 
 ## Docker and public HTTPS
 
@@ -110,7 +110,7 @@ The desktop gateway owns phone pairing/login and route authorization. The relay 
 
 ## Tunnel protocol v1
 
-Connect outbound WSS to `/tunnel` using subprotocol `pudding-relay.v1`. Within five seconds send text JSON `{"type":"hello","protocol":1,"desktopID":"…","token":"…"}`; successful authentication returns `{"type":"hello","protocol":1,"desktopID":"…"}`. The token is never placed in the URL. One desktop may have one active tunnel. Version mismatch or invalid credentials closes it.
+Connect outbound WSS to `/tunnel` using subprotocol `pudding-relay.v1`. Within five seconds send text JSON `{"type":"hello","protocol":1,"desktopID":"…","token":"…"}`; successful authentication returns `{"type":"hello","protocol":1,"desktopID":"…"}`. The token is never placed in the URL. One desktop may have one active tunnel. The relay sends a standard WebSocket Ping every 30 seconds; failure to receive Pong within 10 seconds closes the tunnel and wakes active HTTP streams. Native browser/Node WebSocket clients answer Pong automatically. Version mismatch or invalid credentials closes it.
 
 Every subsequent frame has string `id`:
 

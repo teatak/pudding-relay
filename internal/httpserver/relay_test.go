@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -106,11 +107,11 @@ func TestRegistryRestartDigestPermissionsConcurrent(t *testing.T) {
 		t.Fatal("credential persisted")
 	}
 	info, _ := os.Stat(path)
-	if info.Mode().Perm() != 0600 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
 		t.Fatalf("file permission %o", info.Mode().Perm())
 	}
 	dir, _ := os.Stat(filepath.Dir(path))
-	if dir.Mode().Perm() != 0700 {
+	if runtime.GOOS != "windows" && dir.Mode().Perm() != 0700 {
 		t.Fatalf("directory permission %o", dir.Mode().Perm())
 	}
 	restart, err := OpenStore(path)
@@ -565,5 +566,56 @@ func TestInFlightRequestACKAfterCancelOrEarlyResponseKeepsTunnel(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestHeartbeatClosesNonRespondingDesktopAndWakesHTTP(t *testing.T) {
+	_, server, token := testRelay(t)
+	// coder/websocket only answers Ping while Read runs. After the authenticated
+	// hello this real desktop socket stops reading, simulating a half-open peer.
+	_ = dialDesktop(t, server, token)
+	result := make(chan int, 1)
+	go func() {
+		resp, err := server.Client().Get(server.URL + "/d/desktop-one/api/sessions")
+		if err != nil {
+			result <- 0
+			return
+		}
+		resp.Body.Close()
+		result <- resp.StatusCode
+	}()
+	select {
+	case status := <-result:
+		if status != http.StatusServiceUnavailable {
+			t.Fatalf("heartbeat status %d", status)
+		}
+	case <-time.After(43 * time.Second):
+		t.Fatal("silent desktop remains online and HTTP stream blocked after heartbeat deadline")
+	}
+	resp, err := server.Client().Get(server.URL + "/d/desktop-one/api/sessions")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 503 {
+		t.Fatalf("offline status %d", resp.StatusCode)
+	}
+}
+
+func TestStandardWebSocketPongKeepsDesktopAlive(t *testing.T) {
+	relay, server, token := testRelay(t)
+	c := dialDesktop(t, server, token)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	// The normal desktop reader processes control frames and automatically pongs.
+	go func() { _, _, _ = c.Read(ctx) }()
+	relay.mu.Lock()
+	tun := relay.tunnels["desktop-one"]
+	relay.mu.Unlock()
+	if err := tun.conn.Ping(ctx); err != nil {
+		t.Fatalf("standard Pong not received: %v", err)
+	}
+	if tun.ctx.Err() != nil {
+		t.Fatal("healthy tunnel canceled")
 	}
 }

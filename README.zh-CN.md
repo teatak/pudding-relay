@@ -45,7 +45,7 @@ HTTP 仅允许显式启用的 loopback 测试入口。公网地址必须为 HTTP
 | `--allow-insecure-loopback` | 显式允许 HTTP loopback 测试 |
 | `PUDDING_RELAY_ADMIN_SECRET_FILE` | 必需的管理员密钥文件，去除首尾空白后至少 32 字节 |
 
-`make build` 输出 `bin/pudding-relay` 并嵌入 Git 提交，可用 `VERSION`、`COMMIT` 覆盖构建信息。`--version` 无需服务配置即可显示版本。SIGINT/SIGTERM 关闭隧道、唤醒活动流并关闭 HTTP。登记文件以 `0600` 权限原子替换，新建目录权限为 `0700`。安全备份该文件；遗失凭据需撤销后重建。
+`make build` 输出 `bin/pudding-relay` 并嵌入 Git 提交，可用 `VERSION`、`COMMIT` 覆盖构建信息。`--version` 无需服务配置即可显示版本。SIGINT/SIGTERM 关闭隧道、唤醒活动流并关闭 HTTP。登记文件原子替换；POSIX 系统文件权限为 `0600`，新建目录为 `0700`。Windows 使用数据目录的 ACL 权限。安全备份该文件；遗失凭据需撤销后重建。
 
 ## Docker 与公网 HTTPS
 
@@ -110,7 +110,7 @@ Admin API 要求 `Authorization: Bearer <管理员密钥>`；若传入 `Origin`�
 
 ## 隧道协议 v1
 
-桌面向 `/tunnel` 主动建立 WSS，子协议为 `pudding-relay.v1`。五秒内发送文本 JSON `{"type":"hello","protocol":1,"desktopID":"…","token":"…"}`，成功后返回 `{"type":"hello","protocol":1,"desktopID":"…"}`。token 不放入 URL。每个桌面仅有一个活动隧道；版本不匹配或凭据无效时关闭连接。
+桌面向 `/tunnel` 主动建立 WSS，子协议为 `pudding-relay.v1`。五秒内发送文本 JSON `{"type":"hello","protocol":1,"desktopID":"…","token":"…"}`，成功后返回 `{"type":"hello","protocol":1,"desktopID":"…"}`。token 不放入 URL。每个桌面仅有一个活动隧道。relay 每 30 秒发送标准 WebSocket Ping，10 秒内未收到 Pong 则关闭隧道并唤醒活动 HTTP 流；原生浏览器与 Node WebSocket 自动回复 Pong。版本不匹配或凭据无效时关闭连接。
 
 其余每帧均含字符串 `id`：
 

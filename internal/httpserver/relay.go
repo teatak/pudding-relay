@@ -24,6 +24,8 @@ const Protocol = "pudding-relay.v1"
 const ChunkSize = 32768
 const maxStreams = 64
 const maxFrameBytes = 65536
+const heartbeatInterval = 30 * time.Second
+const heartbeatTimeout = 10 * time.Second
 
 var errFrameTooLarge = errors.New("frame exceeds limit")
 
@@ -142,6 +144,25 @@ func (t *tunnel) send(f frame) error {
 	}
 	return t.conn.Write(ctx, websocket.MessageText, b)
 }
+func (t *tunnel) heartbeat() {
+	ticker := time.NewTicker(heartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-t.ctx.Done():
+			return
+		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(t.ctx, heartbeatTimeout)
+			err := t.conn.Ping(ctx)
+			cancel()
+			if err != nil {
+				t.stop()
+				return
+			}
+		}
+	}
+}
+
 func (r *Relay) acceptTunnel(w http.ResponseWriter, req *http.Request) {
 	c, err := websocket.Accept(w, req, &websocket.AcceptOptions{Subprotocols: []string{Protocol}})
 	if err != nil {
@@ -187,6 +208,7 @@ func (r *Relay) acceptTunnel(w http.ResponseWriter, req *http.Request) {
 	if t.send(frame{Type: "hello", Protocol: 1, DesktopID: hello.DesktopID}) != nil {
 		return
 	}
+	go t.heartbeat()
 	for {
 		typ, b, err = c.Read(tc)
 		if err != nil {
