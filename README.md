@@ -6,16 +6,25 @@ A standalone, self-hosted Go relay for accessing Pudding Desktop from a phone br
 
 The server implements authenticated reverse tunnels, bounded REST/SSE forwarding, persistent desktop credential digests, and a lightweight English/Chinese admin interface. A compatible Pudding Desktop gateway and the shared mobile Web build are required for phone access. Mobile assets are installed separately; building the Go server does not require the private desktop repository.
 
+## Setup flow
+
+1. Deploy the relay with Docker, its private admin-secret file, a public HTTPS domain and matching browser assets. The commands and reverse-proxy example below cover deployment.
+2. In Pudding **Settings → Remote access**, copy the desktop ID. Open your relay's `/admin`, register this ID, and copy the desktop credential that is shown once.
+3. In Pudding Relay settings, enter the relay HTTPS origin and credential. Save and wait for **Connected**.
+4. On the desktop, select **Generate authorization QR**. Scan it on the phone and tap **Connect**. No device-name entry or further desktop approval is needed. The code expires in five minutes and works once.
+
+The desktop displays paired devices and pairing time. **Cancel pairing** immediately revokes browser access; it does not cancel an accepted task. Revoking a desktop credential in relay admin instead disconnects that desktop's entire tunnel.
+
 ## Connection modes and boundaries
 
 Pudding supports two independently enabled entries; both may be active:
 
 | Mode | Path |
 | --- | --- |
-| LAN Direct | Phone → desktop HTTPS gateway → loopback daemon; bypasses this relay |
+| LAN Direct | Phone → desktop HTTP gateway → loopback daemon; bypasses this relay |
 | Relay | Phone → public HTTPS relay → desktop gateway through an outbound WSS tunnel → loopback daemon |
 
-LAN Direct belongs to Pudding Desktop. Both entries reuse mobile Web, desktop pairing, route authorization and business handlers. The daemon stays on loopback, and its startup token stays on the desktop. Users open an explicit endpoint; the first release does not discover or switch endpoints automatically. LAN and relay have separate browser logins under the same desktop authorization model. LAN also requires trusted HTTPS and pairing; there is no HTTP downgrade or certificate-error bypass.
+LAN Direct belongs to Pudding Desktop. Both entries reuse mobile Web, desktop authorization codes, route authorization and business handlers. The daemon stays on loopback, and its startup token stays on the desktop. Users open an explicit endpoint; the first release does not discover or switch endpoints automatically. LAN and relay have separate browser logins under the same desktop authorization model. LAN uses certificate-free HTTP on a trusted local network; relay continues to require public HTTPS/WSS. A LAN address change requires opening the new address and pairing again.
 
 Business requests remain REST; session events remain SSE with `Last-Event-ID` resume. Conversations, tasks, approvals and files remain on the desktop. The relay persists only desktop IDs, labels, creation timestamps and SHA-256 credential digests; it does not persist conversation data or log tokens, cookies, request bodies or message contents. HTTPS/WSS protects each connection, not end-to-end encryption across the relay: users must trust its operator. Run exactly one relay instance with exclusive ownership of its registry file.
 
