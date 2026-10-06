@@ -26,23 +26,24 @@ if(args[0]==='network'&&process.env.FAIL_NETWORK==='1')process.exit(1);
 
 test('install/reinstall preserves admin credentials and configuration, treating .env as data', t => {
   const f = fixture(t);
-  let result = f.run({ PORT: '19080', NETWORK: 'existing-proxy', TRUSTED_PROXIES: '192.0.2.0/24' }); assert.equal(result.status, 0, result.stderr);
+  let result = f.run({ PORT: '19080', NETWORK: 'existing-proxy' }); assert.equal(result.status, 0, result.stderr);
   const secretPath = path.join(f.directory, 'secrets/admin-secret');
   const secret = fs.readFileSync(secretPath, 'utf8'); assert.match(secret, /^[a-f0-9]{64}\n$/);
   assert.equal(result.stdout.includes(secret.trim()), false);
   assert.equal(fs.statSync(path.dirname(secretPath)).mode & 0o777, 0o700);
   assert.equal(fs.statSync(secretPath).mode & 0o777, 0o444);
   const configPath = path.join(f.directory, '.env');
-  fs.appendFileSync(configPath, `UNRELATED=$(touch ${path.join(f.root,'unexpected')})\n# keep comment\nPUBLIC_URL=https://old.example\n`);
+  fs.appendFileSync(configPath, `UNRELATED=$(touch ${path.join(f.root,'unexpected')})\n# keep comment\nPUBLIC_URL=https://old.example\nTRUSTED_PROXIES=172.21.0.0/16\n`);
   const rerunEnv = { ...f.env };
   result = spawnSync('sh', [installer], { env: rerunEnv, encoding: 'utf8' }); assert.equal(result.status, 0, result.stderr);
   assert.equal(fs.readFileSync(secretPath, 'utf8'), secret);
   assert.equal(fs.existsSync(path.join(f.root, 'unexpected')), false);
   const config = fs.readFileSync(configPath, 'utf8');
-  assert.doesNotMatch(config, /PUBLIC_URL=/); assert.match(config, /TRUSTED_PROXIES=192.0.2.0\/24\n/);
+  assert.doesNotMatch(config, /PUBLIC_URL|TRUSTED_PROXIES/);
   assert.match(config, /PORT=19080\n/); assert.match(config, /NETWORK=existing-proxy\n/); assert.match(config, /# keep comment/); assert.match(config, /UNRELATED=/);
   assert.equal(fs.statSync(configPath).mode & 0o777, 0o600);
   assert.match(fs.readFileSync(path.join(f.directory, 'compose.yaml'), 'utf8'), /external: true/);
+  assert.doesNotMatch(fs.readFileSync(path.join(f.directory, 'compose.yaml'), 'utf8'), /TRUSTED_PROXIES/);
   result = f.run({ PORT: '19081', NETWORK: '' }); assert.equal(result.status, 0, result.stderr);
   assert.match(fs.readFileSync(configPath, 'utf8'), /PORT=19081\n/);
   assert.match(fs.readFileSync(configPath, 'utf8'), /NETWORK=\n/);
@@ -54,14 +55,14 @@ test('failed pulls and missing browser resources do not replace a working instal
   const f = fixture(t); const result = f.run(); assert.equal(result.status, 0, result.stderr);
   const before = Object.fromEntries(['.env', 'compose.yaml', 'makefile', 'secrets/admin-secret'].map(file => [file, fs.readFileSync(path.join(f.directory, file))]));
   for (const failure of [{ FAIL_PULL: '1' }, { FAIL_ASSETS: '1' }]) {
-    const result = f.run({ ...failure, TRUSTED_PROXIES: '198.51.100.0/24', PORT: '19081' }); assert.notEqual(result.status, 0);
+    const result = f.run({ ...failure, PORT: '19081' }); assert.notEqual(result.status, 0);
     for (const [file, bytes] of Object.entries(before)) assert.deepEqual(fs.readFileSync(path.join(f.directory, file)), bytes);
   }
 });
 
 test('noninteractive installs need no public URL and reject invalid configuration before pulling', t => {
   const f = fixture(t);
-  for (const override of [{ PORT: '0' }, { PORT: '65536' }, { NETWORK: 'missing', FAIL_NETWORK: '1' }, { IMAGE: '-bad' }, { TRUSTED_PROXIES: 'invalid' }]) {
+  for (const override of [{ PORT: '0' }, { PORT: '65536' }, { NETWORK: 'missing', FAIL_NETWORK: '1' }, { IMAGE: '-bad' }]) {
     const result = f.run(override); assert.notEqual(result.status, 0, JSON.stringify(override));
     assert.equal(fs.existsSync(path.join(f.directory, '.env')), false);
     assert.equal(fs.existsSync(path.join(f.directory, 'secrets/admin-secret')), false);

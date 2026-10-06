@@ -55,7 +55,6 @@ curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.s
 
 | 参数 | 默认值／含义 |
 | --- | --- |
-| `TRUSTED_PROXIES` | 可选，逗号分隔的可信代理 CIDR；默认空，不信任任何转发头 |
 | `INSTALL_DIR` | `$PWD`；以后重复安装使用同一目录 |
 | `IMAGE` | `teatak/pudding-relay:latest`；可改用固定 tag／digest |
 | `PORT` | 宿主机 HTTP 端口，默认 `9623` |
@@ -91,12 +90,11 @@ PUDDING_RELAY_ADMIN_SECRET_FILE="$PWD/secrets/admin-secret" \
 make run
 ```
 
-默认监听 `127.0.0.1:9623`，可直接在可信本机环境使用 HTTP 管理页。公网 HTTPS/WSS 由反向代理处理，Relay 不保存固定外部域名。管理 API 仍要求管理员密钥，并按实际请求 Host 与协议验证浏览器 Origin。只有 `--trusted-proxies`／`PUDDING_RELAY_TRUSTED_PROXIES` 显式配置的 CIDR 能提供 `X-Forwarded-Proto`，默认忽略转发头；不使用 `Forwarded` 或 `X-Forwarded-Host` 决定来源。代理须保留原始 Host，并覆盖协议头而非追加。
+默认监听 `127.0.0.1:9623`，可直接在可信本机环境使用 HTTP 管理页。公网 HTTPS/WSS 由反向代理处理，Relay 不保存固定外部域名。每个管理 API 都要求管理员 Bearer 密钥。管理接口不使用 Cookie 鉴权、不开放 CORS，也不从 Host、Origin 或转发头推断管理员身份。普通反向代理配置即可支持非标准外部 HTTPS 端口，无需可信代理网段或自定义管理路径。
 
 | 参数 | 含义 |
 | --- | --- |
 | `--listen` | HTTP 监听，默认 `127.0.0.1:9623` |
-| `--trusted-proxies` | 可信代理 CIDR，逗号分隔；环境变量 `PUDDING_RELAY_TRUSTED_PROXIES` |
 | `--data-file` | 摘要登记文件，默认 `data/registrations.json` |
 | `--assets-dir` | 共享手机构建目录；环境变量 `PUDDING_RELAY_ASSETS_DIR` |
 | `PUDDING_RELAY_ADMIN_SECRET_FILE` | 必需的管理员密钥文件，去除首尾空白后至少 32 字节 |
@@ -122,7 +120,7 @@ docker compose down
 
 此源码 Compose 构建 `server` 开发 target，仅映射宿主机 loopback，将管理员密钥挂载为文件，在 `relay_data` 卷持久化摘要。镜像使用非 root 用户、只读文件系统并移除 capabilities。用户安装采用上方含浏览器资源的 Docker Hub 发行镜像。设置 `PUDDING_RELAY_PORT=18080` 可更改宿主机端口。除非有意删除全部登记，不使用 `down --volumes`。
 
-代理来源必须明确：配置 `TRUSTED_PROXIES` 为 Relay 实际看到的代理 IP 所属 CIDR，优先使用精确 IPv4 `/32` 或 IPv6 `/128`；若信任专用代理网络，使用其 CIDR。不要将全部互联网或不受信任的共享网络加入列表。Docker 下代理来源可能是容器 IP 或网桥网关，而非宿主机 `127.0.0.1`。
+将反向代理指向 Relay HTTP 后端即可，无需填写可信代理网段或自定义 `/admin/api/` location。桌面与浏览器的配对仍验证已配置公网地址的精确 Origin。
 
 代理须支持 WebSocket upgrade 和不缓冲的 SSE，允许适合部署的附件大小，且不记录凭据、cookie、正文内容。不要将 relay 内部 HTTP 监听直接暴露到公网。真实手机需要受信任的 HTTPS。密钥文件不得提交到版本库；轮换时替换文件并重启 relay。桌面凭据通过 admin 独立撤销。
 
@@ -145,7 +143,7 @@ services:
 
 打开 `/admin`，选择 English 或简体中文，输入管理员密钥。密钥仅在页面内存中，不写浏览器存储。从 Pudding 远程访问设置复制已有桌面 ID，登记后将仅显示一次的凭据填写到桌面中继设置。不要另造中继桌面 ID。撤销会删除摘要、断开隧道并拒绝后续握手；撤销后重新登记相同 ID 会生成新凭据。
 
-Admin API 要求 `Authorization: Bearer <管理员密钥>`；若传入 `Origin`，必须与实际请求同源（协议、Host、端口）。更换代理域名无需重启或修改 Relay；Pudding 桌面端仍需更新连接地址，浏览器在新域名重新配对。响应均为 `Cache-Control: no-store`。
+每次 Admin API 操作都要求 `Authorization: Bearer <管理员密钥>`；Cookie 不能用于管理员鉴权，不开放跨域预检。Host、Origin 或代理协议改写不会拒绝已正确认证的管理请求。更换代理域名无需重启或修改 Relay；Pudding 桌面端仍需更新连接地址，浏览器在新域名重新配对。响应均为 `Cache-Control: no-store`。
 
 | 接口 | 契约 |
 | --- | --- |
@@ -209,7 +207,7 @@ make release-major
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env IMAGE=teatak/pudding-relay:0.1.2 sh
+  | env IMAGE=teatak/pudding-relay:0.1.3 sh
 ```
 
 `latest` 跟随新发行版；固定标签保持该版本，`make upgrade` 沿用安装时选择的镜像。
@@ -224,7 +222,7 @@ make test-install
 git diff --check
 ```
 
-`make check` 检查格式、运行 vet 和 race detector 测试。覆盖摘要持久化和重启、文件权限、并发登记、管理员鉴权、撤销断线、协议、请求同源和可信代理校验、有界帧和流、上传、SSE、可信 headers、取消、退出以及手机深链接。CI 还构建并冒烟测试容器。桌面和真实手机联调需要兼容网关及已安装手机构建。
+`make check` 检查格式、运行 vet 和 race detector 测试。覆盖摘要持久化和重启、文件权限、并发登记、管理员鉴权、撤销断线、协议校验与关闭管理接口 CORS、有界帧和流、上传、SSE、可信 headers、取消、退出以及手机深链接。CI 还构建并冒烟测试容器。桌面和真实手机联调需要兼容网关及已安装手机构建。
 
 ## 许可证
 
@@ -232,6 +230,6 @@ git diff --check
 
 ## 从 0.1.0 升级
 
-重新运行安装命令，让安装器移除已废弃的 `PUBLIC_URL` 和旧 Compose 环境项，并保留密钥与登记数据；只拉取镜像不会更新旧安装模板。HTTPS 反代使用者同时在 `.env` 配置 `TRUSTED_PROXIES`，然后 `make start` 应用配置。`--public-url` 和 `--allow-insecure-loopback` 已删除，不保留旧参数路径。
+重新运行安装命令，让安装器移除已废弃的 `PUBLIC_URL` 和旧 Compose 环境项，并保留密钥与登记数据；只拉取镜像不会更新旧安装模板。从 0.1.3 起，安装器同时移除已废弃的 `TRUSTED_PROXIES`。镜像升级后，可删除此前为非标准 HTTPS 端口添加的自定义管理路径反代配置。`--public-url`、`--allow-insecure-loopback` 和 `--trusted-proxies` 已删除，不保留旧参数路径。
 
-默认服务端口从 `0.1.2` 起统一为 `9623`（Go、容器、健康检查和全新安装）。已有安装的宿主机 `PORT` 会保留；重新运行安装器将 Compose 容器 target 更新为 `9623`。若已有安装使用旧版固定镜像标签，重新运行时显式传入 `IMAGE=teatak/pudding-relay:0.1.2`。
+默认服务端口从 `0.1.2` 起统一为 `9623`（Go、容器、健康检查和全新安装）。已有安装的宿主机 `PORT` 会保留；重新运行安装器将 Compose 容器 target 更新为 `9623`。若已有安装使用旧版固定镜像标签，重新运行时显式传入 `IMAGE=teatak/pudding-relay:0.1.3`。

@@ -37,11 +37,12 @@ async function main() {
   const reference = `localhost:${registryPort}/pudding-relay:smoke`;
   await docker('tag', image, reference);
   await docker('push', reference);
-  const env = { ...process.env, TRUSTED_PROXIES: '', PORT: String(relayPort), IMAGE: reference, NETWORK: '' };
+  const env = { ...process.env, PORT: String(relayPort), IMAGE: reference, NETWORK: '' };
   const invoke = async overrides => run('sh', [installer], { cwd: root, env: { ...env, ...overrides }, maxBuffer: 10 * 1024 * 1024 });
   delete env.INSTALL_DIR;
   delete env.BIND_ADDRESS;
   delete env.PUBLIC_URL;
+  delete env.TRUSTED_PROXIES;
   installed = true;
   const first = await invoke({});
   assert.equal(fs.existsSync(path.join(root, 'pudding-relay')), false);
@@ -78,7 +79,9 @@ async function main() {
   assert.equal(registryBefore.includes(grant.token), false);
   const envBefore = fs.readFileSync(path.join(root, '.env'), 'utf8');
   assert.equal(envBefore.includes('PUBLIC_URL='), false);
-  fs.appendFileSync(path.join(root, '.env'), 'PUBLIC_URL=https://old.example\n');
+  assert.equal(envBefore.includes('TRUSTED_PROXIES='), false);
+  assert.equal(JSON.stringify(config).includes('TRUSTED_PROXIES'), false);
+  fs.appendFileSync(path.join(root, '.env'), 'PUBLIC_URL=https://old.example\nTRUSTED_PROXIES=172.21.0.0/16\n');
   await invoke({});
   assert.equal(fs.readFileSync(path.join(root, 'secrets/admin-secret'), 'utf8'), secret);
   assert.equal(fs.readFileSync(path.join(root, '.env'), 'utf8'), envBefore);

@@ -147,15 +147,6 @@ func TestAdminAuthenticationCreateRevoke(t *testing.T) {
 		t.Fatal(resp.Status)
 	}
 	req.Header.Set("Authorization", "Bearer "+strings.Repeat("a", 32))
-	req.Header.Set("Origin", "https://spoof.example")
-	resp, err = s.Client().Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != 403 {
-		t.Fatal(resp.Status)
-	}
 	req.Header.Set("Origin", s.URL)
 	resp, err = s.Client().Do(req)
 	if err != nil {
@@ -289,8 +280,8 @@ func TestStreamCancellationAndOffline(t *testing.T) {
 		t.Fatal("HTTP cancellation blocked")
 	}
 }
-func TestInvalidHelloAndTrustedProxies(t *testing.T) {
-	r, s, _ := testRelay(t)
+func TestInvalidHello(t *testing.T) {
+	_, s, _ := testRelay(t)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	c, _, err := websocket.Dial(ctx, strings.Replace(s.URL, "http:", "ws:", 1)+"/tunnel", &websocket.DialOptions{Subprotocols: []string{Protocol}})
@@ -301,11 +292,6 @@ func TestInvalidHelloAndTrustedProxies(t *testing.T) {
 	writeFrame(t, c, frame{Type: "hello", Protocol: 2, DesktopID: "desktop-one", Token: strings.Repeat("x", 43)})
 	if _, _, err = c.Read(ctx); err == nil {
 		t.Fatal("invalid protocol accepted")
-	}
-	cfg := r.cfg
-	cfg.TrustedProxies = []string{"not-a-cidr"}
-	if _, _, err := NewRelay(BuildInfo{}, cfg); err == nil {
-		t.Fatal("invalid proxy CIDR accepted")
 	}
 }
 func TestBoundedStreamProtocol(t *testing.T) {

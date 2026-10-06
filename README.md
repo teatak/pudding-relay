@@ -55,7 +55,6 @@ Installation defaults to the current directory; it does not create a `pudding-re
 
 | Parameter | Default / meaning |
 | --- | --- |
-| `TRUSTED_PROXIES` | Optional comma-separated trusted proxy CIDRs; empty trusts no forwarding headers |
 | `INSTALL_DIR` | `$PWD`; reuse the same directory for reinstallation |
 | `IMAGE` | `teatak/pudding-relay:latest`; a fixed tag/digest may be supplied |
 | `PORT` | Host HTTP port, default `9623` |
@@ -91,12 +90,11 @@ PUDDING_RELAY_ADMIN_SECRET_FILE="$PWD/secrets/admin-secret" \
 make run
 ```
 
-The default listener is `127.0.0.1:9623`; HTTP admin works directly in a trusted local environment. A reverse proxy terminates public HTTPS/WSS, and Relay stores no fixed external domain. Admin APIs still require the bearer secret and check browser Origin against the actual Host and protocol. Only CIDRs explicitly configured through `--trusted-proxies` / `PUDDING_RELAY_TRUSTED_PROXIES` may supply `X-Forwarded-Proto`; forwarding headers are ignored by default. Neither `Forwarded` nor `X-Forwarded-Host` selects the authority. Preserve the original Host and overwrite the protocol header rather than appending it.
+The default listener is `127.0.0.1:9623`; HTTP admin works directly in a trusted local environment. A reverse proxy terminates public HTTPS/WSS, and Relay stores no fixed external domain. Every admin API requires the bearer secret. Admin does not use cookie authentication or enable CORS; it does not infer authentication from Host, Origin or forwarding headers. Ordinary reverse-proxy configuration works with nonstandard external HTTPS ports, without a trusted-proxy setting or a custom admin location.
 
 | Option | Meaning |
 | --- | --- |
 | `--listen` | HTTP listener, default `127.0.0.1:9623` |
-| `--trusted-proxies` | Comma-separated trusted proxy CIDRs; environment: `PUDDING_RELAY_TRUSTED_PROXIES` |
 | `--data-file` | Digest registry, default `data/registrations.json` |
 | `--assets-dir` | Shared mobile build directory; environment: `PUDDING_RELAY_ASSETS_DIR` |
 | `PUDDING_RELAY_ADMIN_SECRET_FILE` | Required admin secret file, at least 32 bytes after trimming |
@@ -122,7 +120,7 @@ docker compose down
 
 This source Compose builds the `server` development target, publishes only host loopback, mounts the admin secret as a file and persists digests in `relay_data`. The image runs non-root with a read-only filesystem and dropped capabilities. User installs use the Docker Hub distribution above, which includes browser assets. Set `PUDDING_RELAY_PORT=18080` to change the loopback host port. Do not use `down --volumes` unless intentionally deleting all registrations.
 
-Configure `TRUSTED_PROXIES` using the proxy peer address seen by Relay, preferably an exact IPv4 `/32` or IPv6 `/128`, or the CIDR of a dedicated trusted proxy network. Do not trust the whole internet or an untrusted shared network. In Docker, the peer may be a container IP or bridge gateway instead of host loopback.
+Configure your proxy to reach the Relay HTTP backend. No trusted-proxy CIDRs or custom `/admin/api/` location are required. Desktop/browser pairing still validates the exact configured public origin.
 
 The proxy must support WebSocket upgrade and unbuffered SSE, permit attachment sizes appropriate to your deployment, and avoid logging credential/cookie/body contents. Do not expose the relay's internal HTTP listener to the internet. Provision trusted HTTPS for real phones. Keep the admin secret file outside version control. To rotate it, replace the file and restart the relay. Desktop credentials are independently revoked in admin.
 
@@ -145,7 +143,7 @@ The shared HTML uses `<base href="__PUDDING_REMOTE_BASE__" />`; the relay replac
 
 Open `/admin`, choose English or 简体中文, and enter the admin secret. It stays in page memory and is not stored in browser storage. Copy the desktop's existing ID from Pudding Remote access settings, register it, and copy the one-time credential into the desktop's relay settings. Do not invent a separate relay desktop ID. Revocation removes the stored digest, disconnects the tunnel and rejects future handshakes. Re-registering the same ID after revocation issues a new credential.
 
-Admin APIs require `Authorization: Bearer <admin secret>`; a supplied Origin must match the actual request scheme, Host and port. Changing the proxy domain needs no Relay restart or configuration update. Pudding Desktop still needs its connection URL updated, and browsers pair again at the new origin. Responses use `Cache-Control: no-store`.
+Admin APIs require `Authorization: Bearer <admin secret>` on every operation. Cookies cannot authenticate admin; cross-origin preflight is not enabled. Host/Origin/proxy protocol rewriting does not reject a correctly authenticated admin request. Changing the proxy domain needs no Relay restart or configuration update. Pudding Desktop still needs its connection URL updated, and browsers pair again at the new origin. Responses use `Cache-Control: no-store`.
 
 | Endpoint | Contract |
 | --- | --- |
@@ -209,7 +207,7 @@ Install a fixed version:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env IMAGE=teatak/pudding-relay:0.1.2 sh
+  | env IMAGE=teatak/pudding-relay:0.1.3 sh
 ```
 
 `latest` follows new releases. A fixed tag remains on that version; `make upgrade` keeps the image reference selected at installation.
@@ -224,7 +222,7 @@ make test-install
 git diff --check
 ```
 
-`make check` verifies formatting, runs vet and tests with the race detector. Tests cover digest persistence/restart, file permissions, concurrent registration, admin authentication, revoke/disconnect, protocol/public-origin validation, bounded frames/streams, upload, SSE, trusted headers, cancellation, shutdown and mobile deep links. CI also builds and smoke-tests the container. Desktop and real-phone integration must be tested with a compatible gateway and installed mobile build.
+`make check` verifies formatting, runs vet and tests with the race detector. Tests cover digest persistence/restart, file permissions, concurrent registration, admin authentication, revoke/disconnect, protocol validation and closed admin CORS, bounded frames/streams, upload, SSE, trusted headers, cancellation, shutdown and mobile deep links. CI also builds and smoke-tests the container. Desktop and real-phone integration must be tested with a compatible gateway and installed mobile build.
 
 ## License
 
@@ -232,6 +230,6 @@ git diff --check
 
 ## Upgrading from 0.1.0
 
-Rerun the installer to remove obsolete `PUBLIC_URL` and Compose environment settings while retaining secrets and registration data; pulling an image alone does not update the old template. HTTPS proxy users also set `TRUSTED_PROXIES` in `.env`, then run `make start`. The removed `--public-url` and `--allow-insecure-loopback` flags have no compatibility path.
+Rerun the installer to remove obsolete `PUBLIC_URL` and Compose environment settings while retaining secrets and registration data; pulling an image alone does not update the old template. Starting with 0.1.3, the installer also removes obsolete `TRUSTED_PROXIES`. After updating the image, remove the custom admin proxy location previously required for nonstandard HTTPS ports. The removed `--public-url`, `--allow-insecure-loopback` and `--trusted-proxies` flags have no compatibility path.
 
-Starting with `0.1.2`, the default service port is `9623` across Go, containers, health checks and fresh installations. Existing host `PORT` selections are retained; rerun the installer to update the Compose container target to `9623`. If an installation pins an older image tag, explicitly pass `IMAGE=teatak/pudding-relay:0.1.2` when rerunning.
+Starting with `0.1.2`, the default service port is `9623` across Go, containers, health checks and fresh installations. Existing host `PORT` selections are retained; rerun the installer to update the Compose container target to `9623`. If an installation pins an older image tag, explicitly pass `IMAGE=teatak/pudding-relay:0.1.3` when rerunning.

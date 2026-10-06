@@ -9,7 +9,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -32,17 +31,15 @@ const heartbeatTimeout = 10 * time.Second
 var errFrameTooLarge = errors.New("frame exceeds limit")
 
 type Config struct {
-	TrustedProxies []string
-	AdminSecret    string
-	Store          *Store
-	AssetsDir      string
+	AdminSecret string
+	Store       *Store
+	AssetsDir   string
 }
 type Relay struct {
-	cfg            Config
-	trustedProxies []netip.Prefix
-	mu             sync.Mutex
-	tunnels        map[string]*tunnel
-	closed         bool
+	cfg     Config
+	mu      sync.Mutex
+	tunnels map[string]*tunnel
+	closed  bool
 }
 type frame struct {
 	Type      string            `json:"type"`
@@ -80,14 +77,10 @@ type tunnel struct {
 }
 
 func NewRelay(build BuildInfo, cfg Config) (*Relay, http.Handler, error) {
-	proxies, err := parseTrustedProxies(cfg.TrustedProxies)
-	if err != nil {
-		return nil, nil, err
-	}
 	if len(cfg.AdminSecret) < 32 || cfg.Store == nil {
 		return nil, nil, errors.New("admin secret (32+ bytes) and registration store required")
 	}
-	relay := &Relay{cfg: cfg, trustedProxies: proxies, tunnels: map[string]*tunnel{}}
+	relay := &Relay{cfg: cfg, tunnels: map[string]*tunnel{}}
 	mux := http.NewServeMux()
 	mux.Handle("GET /healthz", NewHandler(build))
 	mux.Handle("GET /version", NewHandler(build))
@@ -528,18 +521,6 @@ func (r *Relay) authorized(w http.ResponseWriter, req *http.Request) bool {
 		w.Header().Set("WWW-Authenticate", "Bearer")
 		errorJSON(w, 401, "admin authentication required")
 		return false
-	}
-	expected, err := r.requestOrigin(req)
-	if err != nil {
-		errorJSON(w, 403, "origin rejected")
-		return false
-	}
-	if origin := req.Header.Get("Origin"); origin != "" {
-		actual, err := canonicalOrigin(origin)
-		if err != nil || actual != expected {
-			errorJSON(w, 403, "origin rejected")
-			return false
-		}
 	}
 	return true
 }

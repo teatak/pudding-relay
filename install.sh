@@ -22,10 +22,8 @@ PORT="${PORT-$(setting PORT)}"
 PORT="${PORT:-9623}"
 BIND_ADDRESS="${BIND_ADDRESS-$(setting BIND_ADDRESS)}"
 BIND_ADDRESS="${BIND_ADDRESS:-0.0.0.0}"
-TRUSTED_PROXIES="${TRUSTED_PROXIES-$(setting TRUSTED_PROXIES)}"
 NETWORK="${NETWORK-$(setting NETWORK)}"
 
-case "$TRUSTED_PROXIES" in *[!0-9a-fA-F.:/,]*) fail 'TRUSTED_PROXIES must contain comma-separated CIDRs.' 'TRUSTED_PROXIES 请填写逗号分隔的 CIDR。' ;; esac
 case "$IMAGE" in -*|*[!a-zA-Z0-9._/@:-]*) fail 'Invalid IMAGE reference.' 'IMAGE 镜像地址无效。' ;; esac
 case "$PORT" in ''|*[!0-9]*) fail 'PORT must be between 1 and 65535.' 'PORT 必须为 1 到 65535。' ;; esac
 [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || fail 'PORT must be between 1 and 65535.' 'PORT 必须为 1 到 65535。'
@@ -72,7 +70,6 @@ cat >> "$relay_env_tmp" <<EOF
 IMAGE=$IMAGE
 PORT=$PORT
 BIND_ADDRESS=$BIND_ADDRESS
-TRUSTED_PROXIES=$TRUSTED_PROXIES
 NETWORK=$NETWORK
 EOF
 
@@ -87,7 +84,6 @@ services:
         published: "${PORT}"
         host_ip: "${BIND_ADDRESS}"
     environment:
-      PUDDING_RELAY_TRUSTED_PROXIES: "${TRUSTED_PROXIES}"
       PUDDING_RELAY_ADMIN_SECRET_FILE: /run/secrets/admin_secret
       PUDDING_RELAY_ASSETS_DIR: /assets
     secrets:
