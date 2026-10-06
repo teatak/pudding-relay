@@ -26,7 +26,7 @@ func TestAdminOriginFollowsHostAndTrustsOnlyExplicitProxyPeers(t *testing.T) {
 		nativeTLS, duplicateProto                      bool
 		status                                         int
 	}{
-		{name: "HTTP bootstrap without domain config", host: "127.0.0.1:8080", origin: "http://127.0.0.1:8080", status: 200},
+		{name: "HTTP bootstrap without domain config", host: "127.0.0.1:9623", origin: "http://127.0.0.1:9623", status: 200},
 		{name: "first HTTPS proxy domain", host: "first.example", origin: "https://first.example", peer: "192.0.2.1:4567", proto: "https", status: 200},
 		{name: "changed HTTPS domain on same running relay", host: "second.example", origin: "https://second.example", peer: "192.0.2.1:4567", proto: "https", status: 200},
 		{name: "cross domain rejected", host: "second.example", origin: "https://first.example", peer: "192.0.2.1:4567", proto: "https", status: 403},

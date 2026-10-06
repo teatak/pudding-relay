@@ -19,7 +19,7 @@ setting() {
 IMAGE="${IMAGE-$(setting IMAGE)}"
 IMAGE="${IMAGE:-teatak/pudding-relay:latest}"
 PORT="${PORT-$(setting PORT)}"
-PORT="${PORT:-8080}"
+PORT="${PORT:-9623}"
 BIND_ADDRESS="${BIND_ADDRESS-$(setting BIND_ADDRESS)}"
 BIND_ADDRESS="${BIND_ADDRESS:-127.0.0.1}"
 TRUSTED_PROXIES="${TRUSTED_PROXIES-$(setting TRUSTED_PROXIES)}"
@@ -83,7 +83,7 @@ services:
   relay:
     image: ${IMAGE}
     ports:
-      - target: 8080
+      - target: 9623
         published: "${PORT}"
         host_ip: "${BIND_ADDRESS}"
     environment:

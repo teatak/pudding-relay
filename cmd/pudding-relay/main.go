@@ -22,7 +22,7 @@ var (
 )
 
 func main() {
-	listen := flag.String("listen", "127.0.0.1:8080", "HTTP listen address / HTTP 监听地址")
+	listen := flag.String("listen", "127.0.0.1:9623", "HTTP listen address / HTTP 监听地址")
 	trustedProxies := flag.String("trusted-proxies", os.Getenv("PUDDING_RELAY_TRUSTED_PROXIES"), "Trusted reverse proxy CIDRs, comma-separated / 可信反向代理 CIDR，逗号分隔")
 	dataFile := flag.String("data-file", "data/registrations.json", "Registration digest file / 登记摘要文件")
 	assetsDir := flag.String("assets-dir", os.Getenv("PUDDING_RELAY_ASSETS_DIR"), "Mobile Web build directory / 手机 Web 构建目录")

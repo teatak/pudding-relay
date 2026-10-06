@@ -39,8 +39,8 @@ jobs:
         run: docker compose up --build --detach --wait --wait-timeout 120
       - name: Check HTTP endpoints
         run: |
-          curl --fail --silent --show-error http://127.0.0.1:8080/healthz
-          curl --fail --silent --show-error http://127.0.0.1:8080/version
+          curl --fail --silent --show-error http://127.0.0.1:9623/healthz
+          curl --fail --silent --show-error http://127.0.0.1:9623/version
       - name: Container logs
         if: failure()
         run: docker compose logs

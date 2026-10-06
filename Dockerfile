@@ -20,11 +20,11 @@ COPY --from=build /out/pudding-relay /usr/local/bin/pudding-relay
 COPY LICENSE /usr/share/doc/pudding-relay/LICENSE
 COPY --from=build /out/licenses /usr/share/doc/pudding-relay/
 USER 65532:65532
-EXPOSE 8080
+EXPOSE 9623
 HEALTHCHECK --interval=10s --timeout=3s --start-period=3s --retries=3 \
-    CMD wget -q --spider http://127.0.0.1:8080/healthz || exit 1
+    CMD wget -q --spider http://127.0.0.1:9623/healthz || exit 1
 ENTRYPOINT ["pudding-relay"]
-CMD ["--listen=0.0.0.0:8080", "--data-file=/data/registrations.json"]
+CMD ["--listen=0.0.0.0:9623", "--data-file=/data/registrations.json"]
 
 # The public distribution includes the same compiled UI used by Pudding Desktop.
 # Supply its binary assets as a named build context; private source is not copied.

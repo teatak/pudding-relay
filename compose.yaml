@@ -5,7 +5,7 @@ services:
       target: server
     image: pudding-relay:local
     ports:
-      - "127.0.0.1:${PUDDING_RELAY_PORT:-8080}:8080"
+      - "127.0.0.1:${PUDDING_RELAY_PORT:-9623}:9623"
     environment:
       PUDDING_RELAY_TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
       PUDDING_RELAY_ADMIN_SECRET_FILE: /run/secrets/admin_secret

@@ -46,7 +46,7 @@ For a noninteractive install, pass the settings directly:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env INSTALL_DIR=/opt/pudding-relay PORT=8080 sh
+  | env INSTALL_DIR=/opt/pudding-relay PORT=9623 sh
 ```
 
 The default directory is `pudding-relay/` under the current directory. Installation creates `.env`, `compose.yaml`, `makefile` and `secrets/admin-secret`. The directory must be writable; system paths such as `/opt` require suitable permissions. Registrations live in the Compose named volume `relay_data`, outside the image. Reinstallation retains the secret, settings and registrations. Explicit environment arguments update their corresponding settings. `.env` is read as data, never executed as shell code.
@@ -56,7 +56,7 @@ The default directory is `pudding-relay/` under the current directory. Installat
 | `TRUSTED_PROXIES` | Optional comma-separated trusted proxy CIDRs; empty trusts no forwarding headers |
 | `INSTALL_DIR` | `$PWD/pudding-relay`; reuse the same directory for reinstallation |
 | `IMAGE` | `teatak/pudding-relay:latest`; a fixed tag/digest may be supplied |
-| `PORT` | Host HTTP port, default `8080` |
+| `PORT` | Host HTTP port, default `9623` |
 | `BIND_ADDRESS` | `127.0.0.1` by default; select a reachable private host IP if needed |
 | `NETWORK` | Optional existing Docker network; empty uses Compose's own network |
 
@@ -89,11 +89,11 @@ PUDDING_RELAY_ADMIN_SECRET_FILE="$PWD/secrets/admin-secret" \
 make run
 ```
 
-The default listener is `127.0.0.1:8080`; HTTP admin works directly in a trusted local environment. A reverse proxy terminates public HTTPS/WSS, and Relay stores no fixed external domain. Admin APIs still require the bearer secret and check browser Origin against the actual Host and protocol. Only CIDRs explicitly configured through `--trusted-proxies` / `PUDDING_RELAY_TRUSTED_PROXIES` may supply `X-Forwarded-Proto`; forwarding headers are ignored by default. Neither `Forwarded` nor `X-Forwarded-Host` selects the authority. Preserve the original Host and overwrite the protocol header rather than appending it.
+The default listener is `127.0.0.1:9623`; HTTP admin works directly in a trusted local environment. A reverse proxy terminates public HTTPS/WSS, and Relay stores no fixed external domain. Admin APIs still require the bearer secret and check browser Origin against the actual Host and protocol. Only CIDRs explicitly configured through `--trusted-proxies` / `PUDDING_RELAY_TRUSTED_PROXIES` may supply `X-Forwarded-Proto`; forwarding headers are ignored by default. Neither `Forwarded` nor `X-Forwarded-Host` selects the authority. Preserve the original Host and overwrite the protocol header rather than appending it.
 
 | Option | Meaning |
 | --- | --- |
-| `--listen` | HTTP listener, default `127.0.0.1:8080` |
+| `--listen` | HTTP listener, default `127.0.0.1:9623` |
 | `--trusted-proxies` | Comma-separated trusted proxy CIDRs; environment: `PUDDING_RELAY_TRUSTED_PROXIES` |
 | `--data-file` | Digest registry, default `data/registrations.json` |
 | `--assets-dir` | Shared mobile build directory; environment: `PUDDING_RELAY_ASSETS_DIR` |
@@ -114,7 +114,7 @@ Start the source HTTP backend:
 
 ```sh
 docker compose up --build --detach --wait
-curl --fail http://127.0.0.1:8080/healthz
+curl --fail http://127.0.0.1:9623/healthz
 docker compose down
 ```
 
@@ -207,7 +207,7 @@ Install a fixed version:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env IMAGE=teatak/pudding-relay:0.1.1 sh
+  | env IMAGE=teatak/pudding-relay:0.1.2 sh
 ```
 
 `latest` follows new releases. A fixed tag remains on that version; `make upgrade` keeps the image reference selected at installation.
@@ -231,3 +231,5 @@ git diff --check
 ## Upgrading from 0.1.0
 
 Rerun the installer to remove obsolete `PUBLIC_URL` and Compose environment settings while retaining secrets and registration data; pulling an image alone does not update the old template. HTTPS proxy users also set `TRUSTED_PROXIES` in `.env`, then run `make start`. The removed `--public-url` and `--allow-insecure-loopback` flags have no compatibility path.
+
+Starting with `0.1.2`, the default service port is `9623` across Go, containers, health checks and fresh installations. Existing host `PORT` selections are retained; rerun the installer to update the Compose container target to `9623`. If an installation pins an older image tag, explicitly pass `IMAGE=teatak/pudding-relay:0.1.2` when rerunning.

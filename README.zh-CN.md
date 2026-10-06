@@ -46,7 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.s
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env INSTALL_DIR=/opt/pudding-relay PORT=8080 sh
+  | env INSTALL_DIR=/opt/pudding-relay PORT=9623 sh
 ```
 
 默认安装到当前目录下的 `pudding-relay/`，会生成 `.env`、`compose.yaml`、`makefile` 和 `secrets/admin-secret`。目录需对当前用户可写；`/opt` 等系统目录需相应权限。登记数据使用 Compose 命名卷 `relay_data`，不会放进镜像。重复运行保留密钥、配置和登记数据；显式传入的参数更新对应配置。`.env` 按数据读取，不作为 shell 脚本执行。
@@ -56,7 +56,7 @@ curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.s
 | `TRUSTED_PROXIES` | 可选，逗号分隔的可信代理 CIDR；默认空，不信任任何转发头 |
 | `INSTALL_DIR` | `$PWD/pudding-relay`；以后重复安装使用同一目录 |
 | `IMAGE` | `teatak/pudding-relay:latest`；可改用固定 tag／digest |
-| `PORT` | 宿主机 HTTP 端口，默认 `8080` |
+| `PORT` | 宿主机 HTTP 端口，默认 `9623` |
 | `BIND_ADDRESS` | 默认 `127.0.0.1`；仅本机访问，按需要改为可达的内网 IP |
 | `NETWORK` | 可选，加入已存在的 Docker 网络；留空使用 Compose 自身网络 |
 
@@ -89,11 +89,11 @@ PUDDING_RELAY_ADMIN_SECRET_FILE="$PWD/secrets/admin-secret" \
 make run
 ```
 
-默认监听 `127.0.0.1:8080`，可直接在可信本机环境使用 HTTP 管理页。公网 HTTPS/WSS 由反向代理处理，Relay 不保存固定外部域名。管理 API 仍要求管理员密钥，并按实际请求 Host 与协议验证浏览器 Origin。只有 `--trusted-proxies`／`PUDDING_RELAY_TRUSTED_PROXIES` 显式配置的 CIDR 能提供 `X-Forwarded-Proto`，默认忽略转发头；不使用 `Forwarded` 或 `X-Forwarded-Host` 决定来源。代理须保留原始 Host，并覆盖协议头而非追加。
+默认监听 `127.0.0.1:9623`，可直接在可信本机环境使用 HTTP 管理页。公网 HTTPS/WSS 由反向代理处理，Relay 不保存固定外部域名。管理 API 仍要求管理员密钥，并按实际请求 Host 与协议验证浏览器 Origin。只有 `--trusted-proxies`／`PUDDING_RELAY_TRUSTED_PROXIES` 显式配置的 CIDR 能提供 `X-Forwarded-Proto`，默认忽略转发头；不使用 `Forwarded` 或 `X-Forwarded-Host` 决定来源。代理须保留原始 Host，并覆盖协议头而非追加。
 
 | 参数 | 含义 |
 | --- | --- |
-| `--listen` | HTTP 监听，默认 `127.0.0.1:8080` |
+| `--listen` | HTTP 监听，默认 `127.0.0.1:9623` |
 | `--trusted-proxies` | 可信代理 CIDR，逗号分隔；环境变量 `PUDDING_RELAY_TRUSTED_PROXIES` |
 | `--data-file` | 摘要登记文件，默认 `data/registrations.json` |
 | `--assets-dir` | 共享手机构建目录；环境变量 `PUDDING_RELAY_ASSETS_DIR` |
@@ -114,7 +114,7 @@ chmod 444 secrets/admin-secret
 
 ```sh
 docker compose up --build --detach --wait
-curl --fail http://127.0.0.1:8080/healthz
+curl --fail http://127.0.0.1:9623/healthz
 docker compose down
 ```
 
@@ -207,7 +207,7 @@ make release-major
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env IMAGE=teatak/pudding-relay:0.1.1 sh
+  | env IMAGE=teatak/pudding-relay:0.1.2 sh
 ```
 
 `latest` 跟随新发行版；固定标签保持该版本，`make upgrade` 沿用安装时选择的镜像。
@@ -231,3 +231,5 @@ git diff --check
 ## 从 0.1.0 升级
 
 重新运行安装命令，让安装器移除已废弃的 `PUBLIC_URL` 和旧 Compose 环境项，并保留密钥与登记数据；只拉取镜像不会更新旧安装模板。HTTPS 反代使用者同时在 `.env` 配置 `TRUSTED_PROXIES`，然后 `make start` 应用配置。`--public-url` 和 `--allow-insecure-loopback` 已删除，不保留旧参数路径。
+
+默认服务端口从 `0.1.2` 起统一为 `9623`（Go、容器、健康检查和全新安装）。已有安装的宿主机 `PORT` 会保留；重新运行安装器将 Compose 容器 target 更新为 `9623`。若已有安装使用旧版固定镜像标签，重新运行时显式传入 `IMAGE=teatak/pudding-relay:0.1.2`。

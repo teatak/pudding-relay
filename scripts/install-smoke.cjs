@@ -54,6 +54,8 @@ async function main() {
   const config = JSON.parse(await docker('compose', '--project-directory', root, '-f', path.join(root, 'compose.yaml'), 'config', '--format', 'json'));
   assert.equal(config.services.relay.read_only, true);
   assert.equal(config.services.relay.ports[0].host_ip, '127.0.0.1');
+  assert.equal(config.services.relay.ports[0].target, 9623);
+  assert.equal(config.services.relay.ports[0].published, String(relayPort));
   checks.push('domain-free HTTP install, CLI/API version, health/admin, bundled UI, loopback binding and non-root image');
   const response = await fetch(`${endpoint}/admin/api/desktops`, { method: 'POST', headers, body: JSON.stringify({ desktopID: 'desktop_install_smoke', label: 'Install smoke' }) });
   assert.equal(response.status, 201); const grant = await response.json();

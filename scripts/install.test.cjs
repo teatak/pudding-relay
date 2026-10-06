@@ -70,4 +70,5 @@ test('noninteractive installs need no public URL and reject invalid configuratio
   const result = f.run(); assert.equal(result.status, 0, result.stderr);
   assert.doesNotMatch(result.stdout, /Public HTTPS URL/);
   assert.doesNotMatch(fs.readFileSync(path.join(f.directory, '.env'), 'utf8'), /PUBLIC_URL/);
+  assert.match(fs.readFileSync(path.join(f.directory, '.env'), 'utf8'), /PORT=9623\n/);
 });
