@@ -5,3 +5,7 @@ coverage.out
 .env
 .env.*
 **/*_test.go
+
+secrets
+data
+mobile-dist
