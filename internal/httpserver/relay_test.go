@@ -31,7 +31,7 @@ func testRelay(t *testing.T) (*Relay, *httptest.Server, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	relay, h, err := NewRelay(BuildInfo{}, Config{Store: store, AdminSecret: strings.Repeat("a", 32), PublicURL: "https://relay.example"})
+	relay, h, err := NewRelay(BuildInfo{}, Config{Store: store, AdminSecret: strings.Repeat("a", 32)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestAdminAuthenticationCreateRevoke(t *testing.T) {
 	if resp.StatusCode != 403 {
 		t.Fatal(resp.Status)
 	}
-	req.Header.Set("Origin", "https://relay.example")
+	req.Header.Set("Origin", s.URL)
 	resp, err = s.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -213,7 +213,7 @@ func TestTunnelForwardUploadSSEAndHeaderBoundary(t *testing.T) {
 	if f.Type != "request" || f.Path != "/api/sessions/session/events?after=4" {
 		t.Fatalf("request %#v", f)
 	}
-	if f.Headers["Cookie"] != "phone=secret" || f.Headers["Last-Event-Id"] != "4" || f.Headers["X-Pudding-Remote-Origin"] != "https://relay.example" || f.Headers["X-Pudding-Remote-Mode"] != "relay" || f.Headers["Authorization"] != "" || f.Headers["X-Forwarded-Host"] != "" {
+	if f.Headers["Cookie"] != "phone=secret" || f.Headers["Last-Event-Id"] != "4" || f.Headers["X-Pudding-Remote-Origin"] != "" || f.Headers["X-Pudding-Remote-Mode"] != "relay" || f.Headers["Authorization"] != "" || f.Headers["X-Forwarded-Host"] != "" {
 		t.Fatalf("headers %#v", f.Headers)
 	}
 	id := f.ID
@@ -289,7 +289,7 @@ func TestStreamCancellationAndOffline(t *testing.T) {
 		t.Fatal("HTTP cancellation blocked")
 	}
 }
-func TestInvalidHelloAndPublicURL(t *testing.T) {
+func TestInvalidHelloAndTrustedProxies(t *testing.T) {
 	r, s, _ := testRelay(t)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -303,18 +303,9 @@ func TestInvalidHelloAndPublicURL(t *testing.T) {
 		t.Fatal("invalid protocol accepted")
 	}
 	cfg := r.cfg
-	for _, u := range []string{"http://relay.example", "https://relay.example/path", "https://user:pass@relay.example", "https://relay.example?secret=x"} {
-		cfg.PublicURL = u
-		if _, _, err := NewRelay(BuildInfo{}, cfg); err == nil {
-			t.Fatal("accepted", u)
-		}
-	}
-	cfg.PublicURL = "http://127.0.0.1:8080"
-	cfg.AllowInsecureLoopback = true
-	if relay, _, err := NewRelay(BuildInfo{}, cfg); err != nil {
-		t.Fatal(err)
-	} else {
-		relay.Close()
+	cfg.TrustedProxies = []string{"not-a-cidr"}
+	if _, _, err := NewRelay(BuildInfo{}, cfg); err == nil {
+		t.Fatal("invalid proxy CIDR accepted")
 	}
 }
 func TestBoundedStreamProtocol(t *testing.T) {

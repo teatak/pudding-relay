@@ -26,8 +26,6 @@ jobs:
       - run: ./bin/pudding-relay --version
 
   docker:
-    env:
-      PUDDING_RELAY_PUBLIC_URL: https://relay.example
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

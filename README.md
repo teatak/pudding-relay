@@ -8,7 +8,7 @@ The server implements authenticated reverse tunnels, bounded REST/SSE forwarding
 
 ## Setup flow
 
-1. Use the one-command installer below and prepare a reachable external HTTPS origin. It generates the admin secret and starts an image containing the browser UI.
+1. Install the HTTP backend using the command below, without a domain or certificate. It generates the admin secret and starts an image containing the browser UI. Your existing reverse proxy handles public HTTPS.
 2. In Pudding **Settings → Remote access**, copy the desktop ID. Open your relay's `/admin`, register this ID, and copy the desktop credential that is shown once.
 3. In Pudding Relay settings, enter the relay HTTPS origin and credential. Save and wait for **Connected**.
 4. On the desktop, select **Generate authorization QR**. Scan it on the phone and tap **Connect**. No device-name entry or further desktop approval is needed. The code expires in five minutes and works once.
@@ -40,20 +40,20 @@ Install Docker Engine and Docker Compose v2, then run on the server:
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh | sh
 ```
 
-The first run asks for the public HTTPS origin, such as `https://relay.example.com`. Relay itself serves HTTP behind your existing HTTPS proxy. Successful installation prints the admin URL and secret-file location, never the secret value. The image includes the shared browser UI and supports Linux amd64/arm64.
+Installation does not ask for a domain or HTTPS origin. Relay serves HTTP behind your existing HTTPS proxy. Successful installation prints the local HTTP admin URL, bind address and secret-file location, never the secret value. The image includes the shared browser UI and supports Linux amd64/arm64.
 
 For a noninteractive install, pass the settings directly:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env PUBLIC_URL=https://relay.example.com INSTALL_DIR=/opt/pudding-relay PORT=8080 sh
+  | env INSTALL_DIR=/opt/pudding-relay PORT=8080 sh
 ```
 
 The default directory is `pudding-relay/` under the current directory. Installation creates `.env`, `compose.yaml`, `makefile` and `secrets/admin-secret`. The directory must be writable; system paths such as `/opt` require suitable permissions. Registrations live in the Compose named volume `relay_data`, outside the image. Reinstallation retains the secret, settings and registrations. Explicit environment arguments update their corresponding settings. `.env` is read as data, never executed as shell code.
 
 | Parameter | Default / meaning |
 | --- | --- |
-| `PUBLIC_URL` | Prompted initially; external HTTPS origin without path, query or fragment |
+| `TRUSTED_PROXIES` | Optional comma-separated trusted proxy CIDRs; empty trusts no forwarding headers |
 | `INSTALL_DIR` | `$PWD/pudding-relay`; reuse the same directory for reinstallation |
 | `IMAGE` | `teatak/pudding-relay:latest`; a fixed tag/digest may be supplied |
 | `PORT` | Host HTTP port, default `8080` |
@@ -86,19 +86,17 @@ mkdir -p secrets
 openssl rand -hex 32 > secrets/admin-secret
 chmod 600 secrets/admin-secret
 PUDDING_RELAY_ADMIN_SECRET_FILE="$PWD/secrets/admin-secret" \
-PUDDING_RELAY_PUBLIC_URL=http://127.0.0.1:8080 \
-go run ./cmd/pudding-relay --allow-insecure-loopback
+make run
 ```
 
-HTTP is permitted only for an explicitly opted-in loopback test origin. Public deployment requires an HTTPS origin with no path, query, fragment or user information. The default listener is `127.0.0.1:8080`; a TLS reverse proxy terminates public HTTPS/WSS. `--public-url` or `PUDDING_RELAY_PUBLIC_URL` defines the trusted public origin; incoming forwarded headers cannot change it.
+The default listener is `127.0.0.1:8080`; HTTP admin works directly in a trusted local environment. A reverse proxy terminates public HTTPS/WSS, and Relay stores no fixed external domain. Admin APIs still require the bearer secret and check browser Origin against the actual Host and protocol. Only CIDRs explicitly configured through `--trusted-proxies` / `PUDDING_RELAY_TRUSTED_PROXIES` may supply `X-Forwarded-Proto`; forwarding headers are ignored by default. Neither `Forwarded` nor `X-Forwarded-Host` selects the authority. Preserve the original Host and overwrite the protocol header rather than appending it.
 
 | Option | Meaning |
 | --- | --- |
 | `--listen` | HTTP listener, default `127.0.0.1:8080` |
-| `--public-url` | Public HTTPS origin; environment: `PUDDING_RELAY_PUBLIC_URL` |
+| `--trusted-proxies` | Comma-separated trusted proxy CIDRs; environment: `PUDDING_RELAY_TRUSTED_PROXIES` |
 | `--data-file` | Digest registry, default `data/registrations.json` |
 | `--assets-dir` | Shared mobile build directory; environment: `PUDDING_RELAY_ASSETS_DIR` |
-| `--allow-insecure-loopback` | Explicit HTTP loopback test opt-in |
 | `PUDDING_RELAY_ADMIN_SECRET_FILE` | Required admin secret file, at least 32 bytes after trimming |
 
 `make build` produces `bin/pudding-relay` and embeds the Git commit; the version comes from `VERSION`, and `COMMIT` can override commit metadata. `--version` prints it without requiring server configuration. SIGINT/SIGTERM closes tunnels, wakes active streams and shuts down HTTP. The registry is atomically replaced; POSIX systems use file mode `0600` and newly created directory mode `0700`. Windows uses the data directory’s ACL permissions. Back it up securely; lost credentials must be revoked and recreated.
@@ -112,23 +110,17 @@ chmod 700 secrets
 chmod 444 secrets/admin-secret
 ```
 
-Set your actual public origin:
+Start the source HTTP backend:
 
 ```sh
-PUDDING_RELAY_PUBLIC_URL=https://relay.example.com docker compose up --build --detach --wait
+docker compose up --build --detach --wait
 curl --fail http://127.0.0.1:8080/healthz
-PUDDING_RELAY_PUBLIC_URL=https://relay.example.com docker compose down
+docker compose down
 ```
 
 This source Compose builds the `server` development target, publishes only host loopback, mounts the admin secret as a file and persists digests in `relay_data`. The image runs non-root with a read-only filesystem and dropped capabilities. User installs use the Docker Hub distribution above, which includes browser assets. Set `PUDDING_RELAY_PORT=18080` to change the loopback host port. Do not use `down --volumes` unless intentionally deleting all registrations.
 
-Place a reverse proxy on the same host, for example Caddy:
-
-```caddyfile
-relay.example.com {
-    reverse_proxy 127.0.0.1:8080
-}
-```
+Configure `TRUSTED_PROXIES` using the proxy peer address seen by Relay, preferably an exact IPv4 `/32` or IPv6 `/128`, or the CIDR of a dedicated trusted proxy network. Do not trust the whole internet or an untrusted shared network. In Docker, the peer may be a container IP or bridge gateway instead of host loopback.
 
 The proxy must support WebSocket upgrade and unbuffered SSE, permit attachment sizes appropriate to your deployment, and avoid logging credential/cookie/body contents. Do not expose the relay's internal HTTP listener to the internet. Provision trusted HTTPS for real phones. Keep the admin secret file outside version control. To rotate it, replace the file and restart the relay. Desktop credentials are independently revoked in admin.
 
@@ -151,7 +143,7 @@ The shared HTML uses `<base href="__PUDDING_REMOTE_BASE__" />`; the relay replac
 
 Open `/admin`, choose English or 简体中文, and enter the admin secret. It stays in page memory and is not stored in browser storage. Copy the desktop's existing ID from Pudding Remote access settings, register it, and copy the one-time credential into the desktop's relay settings. Do not invent a separate relay desktop ID. Revocation removes the stored digest, disconnects the tunnel and rejects future handshakes. Re-registering the same ID after revocation issues a new credential.
 
-Admin APIs require `Authorization: Bearer <admin secret>`; a supplied `Origin` must equal the configured public origin. They return `Cache-Control: no-store`.
+Admin APIs require `Authorization: Bearer <admin secret>`; a supplied Origin must match the actual request scheme, Host and port. Changing the proxy domain needs no Relay restart or configuration update. Pudding Desktop still needs its connection URL updated, and browsers pair again at the new origin. Responses use `Cache-Control: no-store`.
 
 | Endpoint | Contract |
 | --- | --- |
@@ -164,7 +156,7 @@ Admin APIs require `Authorization: Bearer <admin secret>`; a supplied `Origin` m
 | `/d/{desktopID}/api/*`, `/d/{desktopID}/remote/*` | HTTP forwarded through the registered desktop gateway; offline → 503 |
 | `GET /d/{desktopID}/…` | Installed mobile assets; unknown desktop → 404 |
 
-The desktop gateway owns phone pairing/login and route authorization. The relay cannot bypass it and cannot proxy arbitrary destinations. Cookies, `Origin`, and `Last-Event-ID` are forwarded; authorization, host, hop-by-hop, forwarded and incoming `X-Pudding-*` headers are stripped. The relay supplies `X-Pudding-Remote-Origin=<configured origin>` and `X-Pudding-Remote-Mode=relay` itself.
+The desktop gateway owns phone pairing/login and route authorization. The relay cannot bypass it and cannot proxy arbitrary destinations. Cookies, `Origin`, and `Last-Event-ID` are forwarded; authorization, host, hop-by-hop, forwarded and incoming `X-Pudding-*` headers are stripped. The relay only supplies `X-Pudding-Remote-Mode=relay`. Browser Origin is preserved; the desktop gateway validates pairing and business permissions against its configured relay URL.
 
 ## Tunnel protocol v1
 
@@ -215,7 +207,7 @@ Install a fixed version:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env IMAGE=teatak/pudding-relay:0.1.0 sh
+  | env IMAGE=teatak/pudding-relay:0.1.1 sh
 ```
 
 `latest` follows new releases. A fixed tag remains on that version; `make upgrade` keeps the image reference selected at installation.
@@ -235,3 +227,7 @@ git diff --check
 ## License
 
 [Apache License 2.0](LICENSE).
+
+## Upgrading from 0.1.0
+
+Rerun the installer to remove obsolete `PUBLIC_URL` and Compose environment settings while retaining secrets and registration data; pulling an image alone does not update the old template. HTTPS proxy users also set `TRUSTED_PROXIES` in `.env`, then run `make start`. The removed `--public-url` and `--allow-insecure-loopback` flags have no compatibility path.

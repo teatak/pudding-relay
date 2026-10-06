@@ -22,21 +22,10 @@ PORT="${PORT-$(setting PORT)}"
 PORT="${PORT:-8080}"
 BIND_ADDRESS="${BIND_ADDRESS-$(setting BIND_ADDRESS)}"
 BIND_ADDRESS="${BIND_ADDRESS:-127.0.0.1}"
-PUBLIC_URL="${PUBLIC_URL-$(setting PUBLIC_URL)}"
+TRUSTED_PROXIES="${TRUSTED_PROXIES-$(setting TRUSTED_PROXIES)}"
 NETWORK="${NETWORK-$(setting NETWORK)}"
 
-if [ -z "$PUBLIC_URL" ]; then
-  if [ -t 1 ]; then
-    printf 'Public HTTPS URL / 公网 HTTPS 地址（例如 https://relay.example.com）: ' > /dev/tty
-    IFS= read -r PUBLIC_URL < /dev/tty
-  else
-    fail 'Set PUBLIC_URL to the external HTTPS origin.' '请通过 PUBLIC_URL 设置外部 HTTPS 地址。'
-  fi
-fi
-PUBLIC_URL="${PUBLIC_URL%/}"
-case "$PUBLIC_URL" in https://*) ;; *) fail 'PUBLIC_URL must start with https://.' 'PUBLIC_URL 必须以 https:// 开头。' ;; esac
-relay_authority="${PUBLIC_URL#https://}"
-case "$relay_authority" in ''|*[!a-zA-Z0-9.\[\]:_-]*) fail 'Use an HTTPS origin without a path, credentials, query or fragment.' '请使用不含路径、用户名、查询或片段的 HTTPS 地址。' ;; esac
+case "$TRUSTED_PROXIES" in *[!0-9a-fA-F.:/,]*) fail 'TRUSTED_PROXIES must contain comma-separated CIDRs.' 'TRUSTED_PROXIES 请填写逗号分隔的 CIDR。' ;; esac
 case "$IMAGE" in -*|*[!a-zA-Z0-9._/@:-]*) fail 'Invalid IMAGE reference.' 'IMAGE 镜像地址无效。' ;; esac
 case "$PORT" in ''|*[!0-9]*) fail 'PORT must be between 1 and 65535.' 'PORT 必须为 1 到 65535。' ;; esac
 [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || fail 'PORT must be between 1 and 65535.' 'PORT 必须为 1 到 65535。'
@@ -77,13 +66,13 @@ chmod 444 secrets/admin-secret
 
 relay_env_tmp=$(mktemp .env.XXXXXX)
 if [ -f .env ]; then
-  awk '!/^(IMAGE|PORT|BIND_ADDRESS|PUBLIC_URL|NETWORK)=/' .env > "$relay_env_tmp"
+  awk '!/^(IMAGE|PORT|BIND_ADDRESS|PUBLIC_URL|TRUSTED_PROXIES|NETWORK)=/' .env > "$relay_env_tmp"
 fi
 cat >> "$relay_env_tmp" <<EOF
 IMAGE=$IMAGE
 PORT=$PORT
 BIND_ADDRESS=$BIND_ADDRESS
-PUBLIC_URL=$PUBLIC_URL
+TRUSTED_PROXIES=$TRUSTED_PROXIES
 NETWORK=$NETWORK
 EOF
 
@@ -98,7 +87,7 @@ services:
         published: "${PORT}"
         host_ip: "${BIND_ADDRESS}"
     environment:
-      PUDDING_RELAY_PUBLIC_URL: ${PUBLIC_URL}
+      PUDDING_RELAY_TRUSTED_PROXIES: "${TRUSTED_PROXIES}"
       PUDDING_RELAY_ADMIN_SECRET_FILE: /run/secrets/admin_secret
       PUDDING_RELAY_ASSETS_DIR: /assets
     secrets:
@@ -153,6 +142,7 @@ relay_make_tmp=''
 docker compose -f compose.yaml up -d --wait --wait-timeout 120
 printf '\nPudding Relay is running / Pudding Relay 已启动\n'
 printf 'Install directory / 安装目录: %s\n' "$INSTALL_DIR"
-printf 'Admin / 管理地址: %s/admin\n' "$PUBLIC_URL"
+printf 'Local admin / 本机管理地址: http://127.0.0.1:%s/admin\n' "$PORT"
+printf 'HTTP bind / HTTP 绑定地址: %s:%s\n' "$BIND_ADDRESS" "$PORT"
 printf 'Admin secret file / 管理员密钥文件: %s/secrets/admin-secret\n' "$(pwd)"
 printf 'Commands / 管理命令: make upgrade | restart | stop | logs | status\n'

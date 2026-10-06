@@ -8,7 +8,7 @@
 
 ## 接入流程
 
-1. 按下方一键安装部署 relay，准备可访问的外部 HTTPS 地址。安装器会生成管理员密钥并启动含浏览器资源的镜像。
+1. 按下方一键安装部署 HTTP 后端，无需填写域名或准备证书。安装器生成管理员密钥并启动含浏览器资源的镜像；公网 HTTPS 由已有反向代理处理。
 2. 在 Pudding **设置 → 远程访问**复制桌面 ID。打开自己 relay 的 `/admin`，登记此 ID，复制仅显示一次的桌面接入凭据。
 3. 在 Pudding 中继设置填写 relay HTTPS origin 和接入凭据，保存并等待“已连接”。
 4. 在电脑点击“生成授权二维码”，手机扫码后点“连接”。无需输入设备名或再次在电脑批准；授权码五分钟有效，只能使用一次。
@@ -40,20 +40,20 @@ Pudding 支持两个可独立启用、同时使用的入口：
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh | sh
 ```
 
-首次运行会询问公网 HTTPS 地址，例如 `https://relay.example.com`。Relay 自身提供 HTTP 后端，外部 HTTPS 由现有反向代理处理。安装成功会显示管理地址和管理员密钥文件位置，密钥内容不会输出到日志。镜像包含共享浏览器界面，支持 Linux amd64／arm64。
+安装不询问域名或 HTTPS 地址。Relay 提供 HTTP 后端，外部 HTTPS 由现有反向代理处理。安装成功显示本机 HTTP 管理地址、绑定地址和管理员密钥文件位置，密钥内容不会输出到日志。镜像包含共享浏览器界面，支持 Linux amd64／arm64。
 
 非交互安装可以直接传入参数：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env PUBLIC_URL=https://relay.example.com INSTALL_DIR=/opt/pudding-relay PORT=8080 sh
+  | env INSTALL_DIR=/opt/pudding-relay PORT=8080 sh
 ```
 
 默认安装到当前目录下的 `pudding-relay/`，会生成 `.env`、`compose.yaml`、`makefile` 和 `secrets/admin-secret`。目录需对当前用户可写；`/opt` 等系统目录需相应权限。登记数据使用 Compose 命名卷 `relay_data`，不会放进镜像。重复运行保留密钥、配置和登记数据；显式传入的参数更新对应配置。`.env` 按数据读取，不作为 shell 脚本执行。
 
 | 参数 | 默认值／含义 |
 | --- | --- |
-| `PUBLIC_URL` | 首次询问；外部 HTTPS origin，不含路径、查询或片段 |
+| `TRUSTED_PROXIES` | 可选，逗号分隔的可信代理 CIDR；默认空，不信任任何转发头 |
 | `INSTALL_DIR` | `$PWD/pudding-relay`；以后重复安装使用同一目录 |
 | `IMAGE` | `teatak/pudding-relay:latest`；可改用固定 tag／digest |
 | `PORT` | 宿主机 HTTP 端口，默认 `8080` |
@@ -86,19 +86,17 @@ mkdir -p secrets
 openssl rand -hex 32 > secrets/admin-secret
 chmod 600 secrets/admin-secret
 PUDDING_RELAY_ADMIN_SECRET_FILE="$PWD/secrets/admin-secret" \
-PUDDING_RELAY_PUBLIC_URL=http://127.0.0.1:8080 \
-go run ./cmd/pudding-relay --allow-insecure-loopback
+make run
 ```
 
-HTTP 仅允许显式启用的 loopback 测试入口。公网地址必须为 HTTPS origin，不含路径、查询、fragment 或用户信息。默认监听 `127.0.0.1:8080`，由 TLS 反向代理处理公网 HTTPS/WSS。`--public-url` 或 `PUDDING_RELAY_PUBLIC_URL` 定义可信公网 origin，传入的 forwarded headers 无法改变它。
+默认监听 `127.0.0.1:8080`，可直接在可信本机环境使用 HTTP 管理页。公网 HTTPS/WSS 由反向代理处理，Relay 不保存固定外部域名。管理 API 仍要求管理员密钥，并按实际请求 Host 与协议验证浏览器 Origin。只有 `--trusted-proxies`／`PUDDING_RELAY_TRUSTED_PROXIES` 显式配置的 CIDR 能提供 `X-Forwarded-Proto`，默认忽略转发头；不使用 `Forwarded` 或 `X-Forwarded-Host` 决定来源。代理须保留原始 Host，并覆盖协议头而非追加。
 
 | 参数 | 含义 |
 | --- | --- |
 | `--listen` | HTTP 监听，默认 `127.0.0.1:8080` |
-| `--public-url` | 公网 HTTPS origin；环境变量 `PUDDING_RELAY_PUBLIC_URL` |
+| `--trusted-proxies` | 可信代理 CIDR，逗号分隔；环境变量 `PUDDING_RELAY_TRUSTED_PROXIES` |
 | `--data-file` | 摘要登记文件，默认 `data/registrations.json` |
 | `--assets-dir` | 共享手机构建目录；环境变量 `PUDDING_RELAY_ASSETS_DIR` |
-| `--allow-insecure-loopback` | 显式允许 HTTP loopback 测试 |
 | `PUDDING_RELAY_ADMIN_SECRET_FILE` | 必需的管理员密钥文件，去除首尾空白后至少 32 字节 |
 
 `make build` 输出 `bin/pudding-relay` 并嵌入 Git 提交，版本来自 `VERSION` 文件，`COMMIT` 可覆盖提交元数据。`--version` 无需服务配置即可显示版本。SIGINT/SIGTERM 关闭隧道、唤醒活动流并关闭 HTTP。登记文件原子替换；POSIX 系统文件权限为 `0600`，新建目录为 `0700`。Windows 使用数据目录的 ACL 权限。安全备份该文件；遗失凭据需撤销后重建。
@@ -112,23 +110,17 @@ chmod 700 secrets
 chmod 444 secrets/admin-secret
 ```
 
-设置实际公网 origin：
+启动源码 HTTP 后端：
 
 ```sh
-PUDDING_RELAY_PUBLIC_URL=https://relay.example.com docker compose up --build --detach --wait
+docker compose up --build --detach --wait
 curl --fail http://127.0.0.1:8080/healthz
-PUDDING_RELAY_PUBLIC_URL=https://relay.example.com docker compose down
+docker compose down
 ```
 
 此源码 Compose 构建 `server` 开发 target，仅映射宿主机 loopback，将管理员密钥挂载为文件，在 `relay_data` 卷持久化摘要。镜像使用非 root 用户、只读文件系统并移除 capabilities。用户安装采用上方含浏览器资源的 Docker Hub 发行镜像。设置 `PUDDING_RELAY_PORT=18080` 可更改宿主机端口。除非有意删除全部登记，不使用 `down --volumes`。
 
-在同一宿主机配置反向代理，例如 Caddy：
-
-```caddyfile
-relay.example.com {
-    reverse_proxy 127.0.0.1:8080
-}
-```
+代理来源必须明确：配置 `TRUSTED_PROXIES` 为 Relay 实际看到的代理 IP 所属 CIDR，优先使用精确 IPv4 `/32` 或 IPv6 `/128`；若信任专用代理网络，使用其 CIDR。不要将全部互联网或不受信任的共享网络加入列表。Docker 下代理来源可能是容器 IP 或网桥网关，而非宿主机 `127.0.0.1`。
 
 代理须支持 WebSocket upgrade 和不缓冲的 SSE，允许适合部署的附件大小，且不记录凭据、cookie、正文内容。不要将 relay 内部 HTTP 监听直接暴露到公网。真实手机需要受信任的 HTTPS。密钥文件不得提交到版本库；轮换时替换文件并重启 relay。桌面凭据通过 admin 独立撤销。
 
@@ -151,7 +143,7 @@ services:
 
 打开 `/admin`，选择 English 或简体中文，输入管理员密钥。密钥仅在页面内存中，不写浏览器存储。从 Pudding 远程访问设置复制已有桌面 ID，登记后将仅显示一次的凭据填写到桌面中继设置。不要另造中继桌面 ID。撤销会删除摘要、断开隧道并拒绝后续握手；撤销后重新登记相同 ID 会生成新凭据。
 
-Admin API 要求 `Authorization: Bearer <管理员密钥>`；若传入 `Origin`，必须等于配置的公网 origin。响应均为 `Cache-Control: no-store`。
+Admin API 要求 `Authorization: Bearer <管理员密钥>`；若传入 `Origin`，必须与实际请求同源（协议、Host、端口）。更换代理域名无需重启或修改 Relay；Pudding 桌面端仍需更新连接地址，浏览器在新域名重新配对。响应均为 `Cache-Control: no-store`。
 
 | 接口 | 契约 |
 | --- | --- |
@@ -164,7 +156,7 @@ Admin API 要求 `Authorization: Bearer <管理员密钥>`；若传入 `Origin`�
 | `/d/{desktopID}/api/*`、`/d/{desktopID}/remote/*` | 通过已登记桌面网关转发 HTTP；离线 → 503 |
 | `GET /d/{desktopID}/…` | 已安装手机资源；未知桌面 → 404 |
 
-手机配对、登录及路由授权由桌面网关负责。relay 无法绕过网关，也不能代理任意目标。转发 Cookie、`Origin`、`Last-Event-ID`；删除 authorization、host、hop-by-hop、forwarded 和传入的 `X-Pudding-*` headers。relay 自行写入 `X-Pudding-Remote-Origin=<配置 origin>`、`X-Pudding-Remote-Mode=relay`。
+手机配对、登录及路由授权由桌面网关负责。relay 无法绕过网关，也不能代理任意目标。转发 Cookie、`Origin`、`Last-Event-ID`；删除 authorization、host、hop-by-hop、forwarded 和传入的 `X-Pudding-*` headers。relay 仅写入 `X-Pudding-Remote-Mode=relay`。浏览器 Origin 保留，由桌面网关按其已配置的 Relay 地址验证配对和业务权限。
 
 ## 隧道协议 v1
 
@@ -215,7 +207,7 @@ make release-major
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env IMAGE=teatak/pudding-relay:0.1.0 sh
+  | env IMAGE=teatak/pudding-relay:0.1.1 sh
 ```
 
 `latest` 跟随新发行版；固定标签保持该版本，`make upgrade` 沿用安装时选择的镜像。
@@ -230,8 +222,12 @@ make test-install
 git diff --check
 ```
 
-`make check` 检查格式、运行 vet 和 race detector 测试。覆盖摘要持久化和重启、文件权限、并发登记、管理员鉴权、撤销断线、协议和公网 origin 校验、有界帧和流、上传、SSE、可信 headers、取消、退出以及手机深链接。CI 还构建并冒烟测试容器。桌面和真实手机联调需要兼容网关及已安装手机构建。
+`make check` 检查格式、运行 vet 和 race detector 测试。覆盖摘要持久化和重启、文件权限、并发登记、管理员鉴权、撤销断线、协议、请求同源和可信代理校验、有界帧和流、上传、SSE、可信 headers、取消、退出以及手机深链接。CI 还构建并冒烟测试容器。桌面和真实手机联调需要兼容网关及已安装手机构建。
 
 ## 许可证
 
 [Apache License 2.0](LICENSE)。
+
+## 从 0.1.0 升级
+
+重新运行安装命令，让安装器移除已废弃的 `PUBLIC_URL` 和旧 Compose 环境项，并保留密钥与登记数据；只拉取镜像不会更新旧安装模板。HTTPS 反代使用者同时在 `.env` 配置 `TRUSTED_PROXIES`，然后 `make start` 应用配置。`--public-url` 和 `--allow-insecure-loopback` 已删除，不保留旧参数路径。

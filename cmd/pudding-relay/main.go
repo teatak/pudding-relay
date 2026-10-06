@@ -23,10 +23,9 @@ var (
 
 func main() {
 	listen := flag.String("listen", "127.0.0.1:8080", "HTTP listen address / HTTP 监听地址")
-	publicURL := flag.String("public-url", os.Getenv("PUDDING_RELAY_PUBLIC_URL"), "Public HTTPS origin / 公网 HTTPS 地址")
+	trustedProxies := flag.String("trusted-proxies", os.Getenv("PUDDING_RELAY_TRUSTED_PROXIES"), "Trusted reverse proxy CIDRs, comma-separated / 可信反向代理 CIDR，逗号分隔")
 	dataFile := flag.String("data-file", "data/registrations.json", "Registration digest file / 登记摘要文件")
 	assetsDir := flag.String("assets-dir", os.Getenv("PUDDING_RELAY_ASSETS_DIR"), "Mobile Web build directory / 手机 Web 构建目录")
-	insecure := flag.Bool("allow-insecure-loopback", false, "Allow HTTP loopback for local tests only / 仅本地测试允许 HTTP loopback")
 	showVersion := flag.Bool("version", false, "Print build version / 显示构建版本")
 	flag.Parse()
 	if flag.NArg() != 0 {
@@ -55,7 +54,7 @@ func main() {
 		slog.Error("cannot open registration store")
 		os.Exit(1)
 	}
-	cfg := httpserver.Config{PublicURL: *publicURL, AdminSecret: strings.TrimSpace(string(secret)), Store: store, AssetsDir: *assetsDir, AllowInsecureLoopback: *insecure}
+	cfg := httpserver.Config{TrustedProxies: strings.Split(*trustedProxies, ","), AdminSecret: strings.TrimSpace(string(secret)), Store: store, AssetsDir: *assetsDir}
 	if err := serve(ctx, *listen, cfg); err != nil {
 		slog.Error("relay stopped", "error", err)
 		os.Exit(1)

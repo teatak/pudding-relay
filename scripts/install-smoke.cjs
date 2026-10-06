@@ -37,14 +37,15 @@ async function main() {
   const reference = `localhost:${registryPort}/pudding-relay:smoke`;
   await docker('tag', image, reference);
   await docker('push', reference);
-  const env = { ...process.env, INSTALL_DIR: root, PUBLIC_URL: 'https://relay.example.com', PORT: String(relayPort), IMAGE: reference, BIND_ADDRESS: '127.0.0.1', NETWORK: '' };
+  const env = { ...process.env, INSTALL_DIR: root, TRUSTED_PROXIES: '', PORT: String(relayPort), IMAGE: reference, BIND_ADDRESS: '127.0.0.1', NETWORK: '' };
   const invoke = async overrides => run('sh', [installer], { env: { ...env, ...overrides }, maxBuffer: 10 * 1024 * 1024 });
+  delete env.PUBLIC_URL;
   installed = true;
   const first = await invoke({});
   const secret = fs.readFileSync(path.join(root, 'secrets/admin-secret'), 'utf8');
   assert.equal(first.stdout.includes(secret.trim()), false);
-  const headers = { Authorization: `Bearer ${secret.trim()}`, Origin: env.PUBLIC_URL, 'Content-Type': 'application/json' };
   const endpoint = `http://127.0.0.1:${relayPort}`;
+  const headers = { Authorization: `Bearer ${secret.trim()}`, Origin: endpoint, 'Content-Type': 'application/json' };
   assert.equal((await fetch(`${endpoint}/healthz`)).status, 200);
   const expectedVersion = fs.readFileSync(path.resolve(__dirname, '../VERSION'), 'utf8').trim();
   assert.equal((await (await fetch(`${endpoint}/version`)).json()).version, expectedVersion);
@@ -53,7 +54,7 @@ async function main() {
   const config = JSON.parse(await docker('compose', '--project-directory', root, '-f', path.join(root, 'compose.yaml'), 'config', '--format', 'json'));
   assert.equal(config.services.relay.read_only, true);
   assert.equal(config.services.relay.ports[0].host_ip, '127.0.0.1');
-  checks.push('first install, CLI/API version, health/admin, bundled UI check, loopback binding and non-root image');
+  checks.push('domain-free HTTP install, CLI/API version, health/admin, bundled UI, loopback binding and non-root image');
   const response = await fetch(`${endpoint}/admin/api/desktops`, { method: 'POST', headers, body: JSON.stringify({ desktopID: 'desktop_install_smoke', label: 'Install smoke' }) });
   assert.equal(response.status, 201); const grant = await response.json();
   assert.ok(grant.token);
@@ -71,6 +72,8 @@ async function main() {
   const registryBefore = await docker('exec', container, 'cat', '/data/registrations.json');
   assert.equal(registryBefore.includes(grant.token), false);
   const envBefore = fs.readFileSync(path.join(root, '.env'), 'utf8');
+  assert.equal(envBefore.includes('PUBLIC_URL='), false);
+  fs.appendFileSync(path.join(root, '.env'), 'PUBLIC_URL=https://old.example\n');
   await invoke({});
   assert.equal(fs.readFileSync(path.join(root, 'secrets/admin-secret'), 'utf8'), secret);
   assert.equal(fs.readFileSync(path.join(root, '.env'), 'utf8'), envBefore);

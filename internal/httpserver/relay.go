@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -31,18 +32,17 @@ const heartbeatTimeout = 10 * time.Second
 var errFrameTooLarge = errors.New("frame exceeds limit")
 
 type Config struct {
-	PublicURL             string
-	AdminSecret           string
-	Store                 *Store
-	AssetsDir             string
-	AllowInsecureLoopback bool
+	TrustedProxies []string
+	AdminSecret    string
+	Store          *Store
+	AssetsDir      string
 }
 type Relay struct {
-	cfg     Config
-	origin  string
-	mu      sync.Mutex
-	tunnels map[string]*tunnel
-	closed  bool
+	cfg            Config
+	trustedProxies []netip.Prefix
+	mu             sync.Mutex
+	tunnels        map[string]*tunnel
+	closed         bool
 }
 type frame struct {
 	Type      string            `json:"type"`
@@ -80,18 +80,14 @@ type tunnel struct {
 }
 
 func NewRelay(build BuildInfo, cfg Config) (*Relay, http.Handler, error) {
-	u, err := url.Parse(cfg.PublicURL)
-	if err != nil || u == nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
-		return nil, nil, errors.New("public URL must be an HTTPS origin")
-	}
-	local := u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1"
-	if u.Scheme != "https" && !(cfg.AllowInsecureLoopback && local && u.Scheme == "http") {
-		return nil, nil, errors.New("public URL requires HTTPS (HTTP loopback needs explicit opt-in)")
+	proxies, err := parseTrustedProxies(cfg.TrustedProxies)
+	if err != nil {
+		return nil, nil, err
 	}
 	if len(cfg.AdminSecret) < 32 || cfg.Store == nil {
 		return nil, nil, errors.New("admin secret (32+ bytes) and registration store required")
 	}
-	relay := &Relay{cfg: cfg, origin: u.Scheme + "://" + u.Host, tunnels: map[string]*tunnel{}}
+	relay := &Relay{cfg: cfg, trustedProxies: proxies, tunnels: map[string]*tunnel{}}
 	mux := http.NewServeMux()
 	mux.Handle("GET /healthz", NewHandler(build))
 	mux.Handle("GET /version", NewHandler(build))
@@ -380,7 +376,6 @@ func (r *Relay) forward(w http.ResponseWriter, req *http.Request) {
 	// HTTP/1 must allow an early response while the upload goroutine reads the body.
 	_ = http.NewResponseController(w).EnableFullDuplex()
 	headers := cleanHeaders(req.Header)
-	headers["X-Pudding-Remote-Origin"] = r.origin
 	headers["X-Pudding-Remote-Mode"] = "relay"
 	if req.URL.RawQuery != "" {
 		path += "?" + req.URL.RawQuery
@@ -534,9 +529,17 @@ func (r *Relay) authorized(w http.ResponseWriter, req *http.Request) bool {
 		errorJSON(w, 401, "admin authentication required")
 		return false
 	}
-	if origin := req.Header.Get("Origin"); origin != "" && origin != r.origin {
+	expected, err := r.requestOrigin(req)
+	if err != nil {
 		errorJSON(w, 403, "origin rejected")
 		return false
+	}
+	if origin := req.Header.Get("Origin"); origin != "" {
+		actual, err := canonicalOrigin(origin)
+		if err != nil || actual != expected {
+			errorJSON(w, 403, "origin rejected")
+			return false
+		}
 	}
 	return true
 }
