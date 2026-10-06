@@ -15,6 +15,7 @@ esac
 [ -f "$WEB_ASSETS_DIR/index.html" ] || { printf 'Missing browser index.html\n' >&2; exit 1; }
 grep -q '__PUDDING_REMOTE_BASE__' "$WEB_ASSETS_DIR/index.html" || { printf 'Not a Pudding browser build\n' >&2; exit 1; }
 [ -f "$WEB_LEGAL_DIR/PUDDING-LICENSE.txt" ] && [ -f "$WEB_LEGAL_DIR/THIRD_PARTY_NOTICES.txt" ] || { printf 'Missing browser license/notices\n' >&2; exit 1; }
+node "$relay_root/scripts/validate-browser-build.cjs" "$WEB_ASSETS_DIR"
 relay_context=$(mktemp -d "${TMPDIR:-/tmp}/pudding-relay-browser.XXXXXX")
 trap 'rm -rf "$relay_context"' EXIT
 trap 'exit 1' HUP INT TERM

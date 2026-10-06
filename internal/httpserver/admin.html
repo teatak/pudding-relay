@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Pudding Relay</title>
+<style>
+:root{color-scheme:light dark;--bg:#f7f7f9;--surface:#fff;--raised:#fafafa;--text:#25232c;--muted:#797681;--line:#e8e7ed;--accent:#7055d5;--accent-text:#fff;--accent-soft:#f0ebfc;--green:#25835b;--green-soft:#edf8f1;--red:#c24b54;--red-soft:#fff1f2;--shadow:0 6px 24px #28203d06;font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+
+@media(prefers-color-scheme:dark){:root{--bg:#17161b;--surface:#222127;--raised:#29282f;--text:#eeedf2;--muted:#a19daa;--line:#35333d;--accent:#b29bf4;--accent-text:#1c152e;--accent-soft:#322b43;--green:#8acaac;--green-soft:#23362d;--red:#f09aa2;--red-soft:#3c272b;--shadow:none}
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text)}
+button,input,select{font:inherit}
+button,a,input,select{outline-offset:4px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent)}
+button{cursor:pointer}
+button:disabled{cursor:default;opacity:.55}
+a{color:inherit;text-decoration:none}
+a:hover{text-decoration:underline}
+button,input,select{border-radius:9px;border:1px solid var(--line)}
+input,select{color:var(--text);background:var(--surface)}
+input{width:100%;padding:11px 12px;min-height:44px}
+select{padding:7px 10px}
+button{display:inline-flex;justify-content:center;align-items:center;gap:7px;padding:9px 13px;min-height:38px;color:var(--text);background:var(--surface);font-weight:550}
+button:hover:not(:disabled){background:var(--raised)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
+button.primary:hover:not(:disabled){filter:brightness(1.06);background:var(--accent)}
+button.subtle{background:transparent;border-color:transparent}
+button.danger{color:var(--red)}
+button.icon{padding:8px;min-width:36px}
+svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+[hidden]{display:none!important}
+.shell{max-width:1160px;margin:auto;padding:0 28px 48px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:88px;border-bottom:1px solid var(--line)}
+.brand{display:flex;gap:12px;align-items:center}
+.mark{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:var(--accent-soft);color:var(--accent);font-size:25px;font-weight:750;line-height:1}
+.brand strong{font-size:18px;letter-spacing:-.4px}
+.brand small{display:block;color:var(--muted);font-size:12px}
+.top-actions{display:flex;align-items:center;gap:10px}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;font-size:12px;color:var(--muted);background:var(--raised)}
+.badge.online{color:var(--green);background:var(--green-soft)}
+.dot{height:6px;width:6px;background:currentColor;border-radius:50%;display:inline-block}
+.intro{padding:30px 0 24px}
+.eyebrow{color:var(--accent);font-size:12px;font-weight:650;letter-spacing:.04em}
+.intro h1{font-size:28px;letter-spacing:-.8px;line-height:1.25;margin:8px 0 10px}
+.intro p{margin:0;max-width:670px;color:var(--muted)}
+.login-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(330px,430px);gap:58px;align-items:start;margin-top:24px}
+.login-copy{padding:18px 0}
+.login-copy h2{font-size:28px;line-height:1.25;letter-spacing:-.7px;max-width:400px;margin:0 0 18px}
+.login-copy>p{max-width:440px;color:var(--muted);margin:0 0 28px}
+.steps{list-style:none;padding:0;margin:0;display:grid;gap:20px}
+.steps li{display:flex;gap:12px;align-items:flex-start}
+.step-number{display:grid;place-items:center;border:1px solid var(--line);background:var(--surface);border-radius:8px;width:29px;height:29px;flex:none;font-size:12px;color:var(--muted)}
+.steps strong{display:block;font-size:13px}
+.steps p{margin:3px 0 0;font-size:12px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);min-width:0}
+.card-body{padding:24px}
+.card-title{font-size:16px;margin:0;letter-spacing:-.3px}
+.card-hint{font-size:12px;color:var(--muted);margin:5px 0 20px}
+.field{margin:0 0 17px}
+.field label{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:600;margin-bottom:7px}
+.optional{font-weight:400;color:var(--muted)}
+.field small{display:block;color:var(--muted);font-size:11px;margin-top:6px}
+.full{width:100%}
+.secure-note{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:11px;margin:14px 0 0}
+.secure-note svg{width:14px;height:14px;margin-top:2px}
+.workspace{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(320px,1fr);gap:22px}
+.devices-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:20px 22px;border-bottom:1px solid var(--line)}
+.count{margin-left:8px;font-size:12px;font-weight:400;color:var(--muted)}
+.empty{display:grid;place-items:center;min-height:225px;text-align:center;padding:28px;color:var(--muted)}
+.empty svg{width:28px;height:28px;color:var(--accent);margin-bottom:10px}
+.empty strong{display:block;font-size:14px;color:var(--text);margin:0 0 5px}
+.empty p{font-size:12px;margin:0;max-width:280px}
+.device{padding:18px 22px;display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:start;border-bottom:1px solid var(--line)}
+.device:last-child{border-bottom:none}
+.device-symbol{display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--line);border-radius:10px;color:var(--muted);background:var(--raised)}
+.device-name{font-size:14px;font-weight:600}
+.device-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;overflow-wrap:anywhere}
+.device-id{display:flex;align-items:center;gap:5px;color:var(--muted)}
+.device-id code{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.device-id button{min-height:25px;padding:3px;border:0;background:transparent;color:var(--muted)}
+.device-id svg{width:13px;height:13px}
+.device-date{color:var(--muted);font-size:11px;margin-top:5px}
+.device-actions{display:flex;gap:3px}
+.side{display:grid;align-content:start;gap:18px}
+.endpoint{border-top:1px solid var(--line);padding-top:16px;margin-top:17px}
+.endpoint label{font-size:11px;color:var(--muted)}
+.copy-line{display:flex;align-items:center;gap:9px;margin-top:6px}
+.copy-line code{min-width:0;flex:1}
+.credential{border-color:color-mix(in srgb,var(--accent) 32%,var(--line));grid-column:1/-1}
+.credential-heading{display:flex;gap:10px;align-items:center}
+.credential-heading svg{color:var(--accent)}
+.credential-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.8fr);gap:30px;margin-top:20px}
+.credential-token{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:11px;margin:8px 0 12px}
+.credential-token input{min-height:36px;padding:7px;font-size:12px;border:none;background:transparent}
+.credential-token .token-actions{display:flex;justify-content:flex-end;gap:5px;margin-top:7px}
+.token-actions button{font-size:11px;min-height:28px;padding:5px 9px}
+.credential-details{display:grid;gap:9px;font-size:12px}
+.credential-details code{font-size:11px;color:var(--muted)}
+.credential-next{padding-left:23px;margin:0;color:var(--muted);font-size:12px}
+.credential-next li{margin:0 0 10px}
+.credential-footer{display:flex;justify-content:flex-end;padding-top:18px;margin-top:18px;border-top:1px solid var(--line)}
+.notice{margin-top:18px;border-radius:10px;font-size:12px;padding:11px 14px;background:var(--green-soft);color:var(--green)}
+.notice.error{color:var(--red);background:var(--red-soft)}
+.footer{margin-top:32px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--muted);font-size:11px}
+.footer a{color:var(--muted)}
+dialog{color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:16px;max-width:420px;width:calc(100% - 36px);padding:26px;box-shadow:0 24px 80px #0003}
+dialog::backdrop{background:#15122266;backdrop-filter:blur(3px)}
+dialog h2{margin:0 0 10px;font-size:19px}
+dialog p{color:var(--muted);font-size:13px;margin:0 0 20px}
+.dialog-actions{display:flex;justify-content:flex-end;gap:8px}
+.device-target{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;overflow-wrap:anywhere;margin-bottom:20px}
+.registration-note{font-size:11px;color:var(--muted);margin:13px 0 0}
+
+@media(max-width:800px){.shell{padding:0 18px 30px}
+.login-layout,.workspace{grid-template-columns:1fr;gap:20px}
+.login-layout{margin-top:12px}
+.login-copy{padding:0}
+.login-copy h2{font-size:24px;max-width:none}
+.login-copy>p{margin-bottom:20px}
+.login-copy .steps{display:none}
+.intro{padding-top:25px}
+.intro h1{font-size:25px}
+.credential-grid{grid-template-columns:1fr;gap:15px}
+.side{grid-row:2}
+.credential{grid-row:1}
+.card-body{padding:20px}
+.topbar{min-height:76px}
+.brand small{display:none}
+.top-actions{gap:5px}
+.device{padding:16px;grid-template-columns:30px minmax(0,1fr) auto;gap:9px}
+.device-symbol{width:30px;height:30px}
+.footer{align-items:flex-start}
+.connected-label{display:none}
+}
+@media(max-width:420px){.shell{padding-inline:14px}
+.brand strong{font-size:16px}
+.mark{width:32px;height:32px;font-size:22px}
+.brand{gap:9px}
+.top-actions select{max-width:106px;font-size:12px}
+.top-actions button{padding:7px 9px;font-size:12px}
+.device-actions button{padding:5px;min-width:30px}
+.device-actions .action-label{display:none}
+}
+
+</style>
+</head>
+<body><div class="shell">
+<header class="topbar"><div class="brand"><span class="mark" aria-hidden="true">P</span><div><strong>Pudding Relay</strong><small data-i18n="tagline"></small></div></div><div class="top-actions"><span id="connectionBadge" class="badge online" hidden><span class="dot"></span><span class="connected-label" data-i18n="connected"></span></span><button id="disconnect" class="subtle" hidden data-i18n="disconnect"></button><select id="lang" aria-label="Language"><option value="en">English</option><option value="zh">简体中文</option></select></div></header>
+<main>
+<section class="intro"><span class="eyebrow" data-i18n="eyebrow"></span><h1 data-i18n="heading"></h1><p data-i18n="intro"></p></section>
+<div id="loginView" class="login-layout"><div class="login-copy"><h2 data-i18n="loginHeading"></h2><p data-i18n="loginIntro"></p><ol class="steps"><li><span class="step-number">1</span><div><strong data-i18n="step1"></strong><p data-i18n="step1Hint"></p></div></li><li><span class="step-number">2</span><div><strong data-i18n="step2"></strong><p data-i18n="step2Hint"></p></div></li><li><span class="step-number">3</span><div><strong data-i18n="step3"></strong><p data-i18n="step3Hint"></p></div></li></ol></div><section class="card"><div class="card-body"><h2 class="card-title" data-i18n="loginTitle"></h2><p class="card-hint" data-i18n="loginHint"></p><form id="login"><div class="field"><label for="secret" data-i18n="secretLabel"></label><input id="secret" type="password" autocomplete="off" required minlength="32" data-placeholder="secretPlaceholder"></div><button id="connect" class="primary full" type="submit" data-i18n="connect"></button></form><p class="secure-note"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span data-i18n="secretHint"></span></p></div></section></div>
+<div id="manage" class="workspace" hidden>
+<section id="credential" class="card credential" hidden><div class="card-body"><div class="credential-heading"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="8" cy="9" r="4"/><path d="m11 12 8 8m-3-3 2-2m-5-1 2-2"/></svg><div><h2 class="card-title" data-i18n="credentialTitle"></h2><p class="card-hint" style="margin-bottom:0" data-i18n="once"></p></div></div><div class="credential-grid"><div><label for="token" data-i18n="tokenLabel"></label><div class="credential-token"><input class="mono" id="token" readonly type="password" autocomplete="off"><div class="token-actions"><button id="toggleToken" type="button" data-i18n="showToken"></button><button id="copyToken" class="primary" type="button" data-i18n="copyToken"></button></div></div><div class="credential-details"><div><span data-i18n="relayURL"></span> · <code id="credentialURL"></code></div><div><span data-i18n="idLabel"></span> · <code id="credentialID"></code></div></div></div><ol class="credential-next"><li data-i18n="credentialStep1"></li><li data-i18n="credentialStep2"></li><li data-i18n="credentialStep3"></li></ol></div><div class="credential-footer"><button id="dismissCredential" type="button" data-i18n="savedCredential"></button></div></div></section>
+<section class="card"><div class="devices-head"><h2 class="card-title"><span data-i18n="devicesTitle"></span><span id="deviceCount" class="count">0</span></h2><button id="refresh" class="subtle icon" type="button" data-label="refresh"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M19 12a7 7 0 0 0-12-5M5 12a7 7 0 0 0 12 5"/></svg></button></div><div id="desktops"></div><div id="empty" class="empty" hidden><div><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg><strong data-i18n="emptyTitle"></strong><p data-i18n="emptyHint"></p></div></div></section>
+<aside class="side"><section class="card"><div class="card-body"><h2 class="card-title" data-i18n="newLabel"></h2><p class="card-hint" data-i18n="registerHint"></p><form id="register"><div class="field"><label for="desktopID" data-i18n="idLabel"></label><input class="mono" id="desktopID" required maxlength="128" pattern="[A-Za-z0-9_\-]+" autocomplete="off" data-placeholder="idPlaceholder"><small data-i18n="idHelp"></small></div><div class="field"><label for="label"><span data-i18n="labelLabel"></span><span class="optional" data-i18n="optional"></span></label><input id="label" maxlength="256" autocomplete="off" data-placeholder="labelPlaceholder"></div><button id="create" class="primary full" type="submit" data-i18n="create"></button></form><p class="registration-note" data-i18n="registrationNote"></p><div class="endpoint"><label data-i18n="relayURL"></label><div class="copy-line"><code class="mono" id="relayOrigin"></code><button id="copyURL" class="icon subtle" type="button" data-label="copyURL"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg></button></div></div></div></section><p class="secure-note"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/></svg><span data-i18n="relayHint"></span></p></aside>
+</div>
+<p id="message" class="notice" role="status" aria-live="polite" hidden></p>
+</main><footer class="footer"><span id="version">Pudding Relay</span><a href="https://github.com/teatak/pudding-relay" target="_blank" rel="noopener noreferrer" data-i18n="guide"></a></footer>
+</div>
+<dialog id="revokeDialog"><h2 data-i18n="revokeTitle"></h2><p data-i18n="confirm"></p><div id="revokeTarget" class="device-target"></div><form method="dialog" class="dialog-actions"><button id="cancelRevoke" value="cancel" data-i18n="cancel"></button><button id="confirmRevoke" value="confirm" class="danger" data-i18n="revoke"></button></form></dialog>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const icons={desktop:'<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>',copy:'<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>',revoke:'<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 7h14m-10 0V4h6v3M7 7l1 13h8l1-13m-6 3v7m3-7v7"/></svg>'};
+let accessController=null,secret='',locale=(navigator.language||'en').startsWith('zh')?'zh':'en',desktops=[],createdCredential=null,revokingID='',busy=false;
+const words={
+en:{tagline:'Self-hosted remote access',eyebrow:'YOUR RELAY, YOUR DEVICES',heading:'A bridge to your Pudding desktop.',intro:'Register your computers once. Connect Pudding, then access your sessions from any browser.',loginHeading:'Keep your desktop within reach.',loginIntro:'This relay connects your browser to Pudding running on your computer. Sessions and tasks stay on the desktop.',step1:'Register your desktop',step1Hint:'Use the ID from Pudding Settings → Remote access.',step2:'Connect Pudding',step2Hint:'Paste the relay address and desktop credential into Pudding.',step3:'Pair your browser',step3Hint:'Generate an authorization QR on the desktop and scan it.',loginTitle:'Manage this relay',loginHint:'Enter the administrator secret configured when you deployed this service.',secretLabel:'Administrator secret',secretPlaceholder:'Paste your administrator secret',secretHint:'The secret is kept in this tab’s memory only. Signing out or closing this tab clears it.',connect:'Connect securely',connected:'Connected',disconnect:'Sign out',devicesTitle:'Registered desktops',newLabel:'Register a desktop',registerHint:'Create the credential that connects Pudding to this relay.',idLabel:'Desktop ID',idPlaceholder:'desktop_…',idHelp:'Copy it from Pudding Settings → Remote access. Do not create another ID.',labelLabel:'Device name',optional:'Optional',labelPlaceholder:'e.g. Work MacBook',create:'Create desktop credential',registrationNote:'The relay stores only a credential digest. Your desktop keeps sessions and tasks.',relayURL:'Relay address',copyURL:'Copy relay address',relayHint:'Only register computers you own. Revoking a credential disconnects that computer’s tunnel.',emptyTitle:'No desktops registered yet',emptyHint:'Copy your desktop ID from Pudding and create its first credential here.',refresh:'Refresh desktops',online:'Online',offline:'Offline',open:'Open remote access',copyID:'Copy Desktop ID',revoke:'Revoke',revokeTitle:'Revoke desktop access?',confirm:'This disconnects the desktop tunnel and invalidates its credential. Tasks on the computer continue running.',cancel:'Cancel',credentialTitle:'Your desktop credential is ready',once:'Copy and save it now. It is shown only once.',tokenLabel:'Desktop access credential',showToken:'Show',hideToken:'Hide',copyToken:'Copy credential',credentialStep1:'Open Pudding Settings → Remote access → Relay.',credentialStep2:'Paste this relay address and credential, then enable Relay and save.',credentialStep3:'When connected, generate an authorization QR to pair your browser.',savedCredential:'I’ve saved the credential',copied:'Copied',copyFailed:'Copy is unavailable here. Select and copy the text manually.',loaded:'Desktop list updated',created:'Desktop registered',revoked:'Desktop credential revoked',error:'Request failed',authError:'The administrator secret is invalid or expired. Connect again.',existsError:'This desktop is already registered. Revoke its old credential first if you need a new one.',networkError:'Unable to reach the relay. Check the connection and retry.',guide:'Documentation ↗',registered:'Registered',saving:'Creating…',connecting:'Connecting…'},
+zh:{tagline:'自部署远程访问',eyebrow:'你的中继，你的设备',heading:'让 Pudding 随时可达。',intro:'登记你的电脑，将 Pudding 连接到中继，再用任意浏览器访问会话。',loginHeading:'外出时，也能连接你的 Pudding。',loginIntro:'中继连接浏览器与电脑上的 Pudding。会话、任务与执行始终留在电脑端。',step1:'登记电脑',step1Hint:'使用 Pudding 设置 → 远程访问中的桌面 ID。',step2:'连接 Pudding',step2Hint:'在电脑端填写中继地址和桌面接入凭据。',step3:'配对浏览器',step3Hint:'电脑生成授权二维码，浏览器扫码连接。',loginTitle:'管理这个中继',loginHint:'输入部署服务时配置的管理员密钥。',secretLabel:'管理员密钥',secretPlaceholder:'粘贴管理员密钥',secretHint:'密钥仅留在当前页面内存。退出或关闭页面后即清除，不保存到浏览器。',connect:'连接管理服务',connected:'已连接',disconnect:'退出',devicesTitle:'已登记的电脑',newLabel:'登记一台电脑',registerHint:'创建用于连接 Pudding 与中继的桌面接入凭据。',idLabel:'桌面 ID',idPlaceholder:'desktop_…',idHelp:'从 Pudding 设置 → 远程访问复制，不需要另外生成 ID。',labelLabel:'设备名称',optional:'选填',labelPlaceholder:'例如：工作用 MacBook',create:'创建桌面接入凭据',registrationNote:'中继仅存储凭据摘要，会话和任务由电脑端保存。',relayURL:'中继地址',copyURL:'复制中继地址',relayHint:'仅登记你自己的电脑。撤销凭据会断开该电脑的中继连接。',emptyTitle:'还没有登记电脑',emptyHint:'从 Pudding 复制桌面 ID，在右侧创建第一份接入凭据。',refresh:'刷新电脑列表',online:'在线',offline:'离线',open:'打开远程访问',copyID:'复制桌面 ID',revoke:'撤销',revokeTitle:'撤销这台电脑的接入？',confirm:'该电脑的中继连接将断开，接入凭据立即失效。电脑上的任务会继续运行。',cancel:'取消',credentialTitle:'桌面接入凭据已准备好',once:'请立即复制保存，之后不会再次显示。',tokenLabel:'桌面接入凭据',showToken:'显示',hideToken:'隐藏',copyToken:'复制凭据',credentialStep1:'打开 Pudding 设置 → 远程访问 → 中继连接。',credentialStep2:'填写这里的中继地址和凭据，启用中继并保存。',credentialStep3:'连接成功后，在电脑生成授权二维码配对浏览器。',savedCredential:'我已保存凭据',copied:'已复制',copyFailed:'当前环境无法复制，请选择文本后手动复制。',loaded:'电脑列表已更新',created:'电脑登记成功',revoked:'桌面接入凭据已撤销',error:'请求失败',authError:'管理员密钥无效或已过期，请重新连接。',existsError:'这台电脑已经登记。如需新凭据，请先撤销原有凭据。',networkError:'无法连接中继，请检查网络后重试。',guide:'使用说明 ↗',registered:'登记于',saving:'正在创建…',connecting:'正在连接…'}};
+function tr(key){return words[locale][key]}
+function localize(){document.documentElement.lang=locale==='zh'?'zh-CN':'en';$('lang').value=locale;document.querySelectorAll('[data-i18n]').forEach(node=>node.textContent=tr(node.dataset.i18n));document.querySelectorAll('[data-placeholder]').forEach(node=>node.placeholder=tr(node.dataset.placeholder));document.querySelectorAll('[data-label]').forEach(node=>{node.setAttribute('aria-label',tr(node.dataset.label));node.title=tr(node.dataset.label)});$('toggleToken').textContent=tr($('token').type==='password'?'showToken':'hideToken');render();}
+function notice(text,error=false){$('message').textContent=text;$('message').classList.toggle('error',error);$('message').hidden=!text}
+function forgetCredential(){createdCredential=null;$('token').value='';$('credentialID').textContent='';$('credentialURL').textContent='';$('credential').hidden=true;$('token').type='password';}
+function signOut(){accessController?.abort();accessController=null;secret='';desktops=[];revokingID='';forgetCredential();$('manage').hidden=true;$('loginView').hidden=false;$('connectionBadge').hidden=true;$('disconnect').hidden=true;render();}
+function setBusy(value){busy=value;for(const id of ['connect','create','refresh','confirmRevoke','disconnect'])$(id).disabled=value;$('connect').textContent=tr(value?'connecting':'connect');$('create').textContent=tr(value?'saving':'create');}
+async function api(path,options={}){let response;try{response=await fetch('/admin/api/desktops'+path,{...options,headers:{Authorization:'Bearer '+secret,'Content-Type':'application/json'},cache:'no-store',signal:accessController?.signal})}catch(error){if(error.name==='AbortError')throw error;throw new Error(tr('networkError'))}if(!response.ok){if(response.status===401){signOut();throw new Error(tr('authError'))}throw new Error(response.status===409?tr('existsError'):tr('error')+' ('+response.status+')')}return response.status===204?null:response.json();}
+async function load(){const result=await api('');desktops=result.desktops;render();$('manage').hidden=false;$('loginView').hidden=true;$('connectionBadge').hidden=false;$('disconnect').hidden=false;}
+function render(){const list=$('desktops');list.replaceChildren();$('deviceCount').textContent=String(desktops.length);$('empty').hidden=desktops.length!==0;for(const item of desktops){const row=document.createElement('article');row.className='device';row.dataset.desktopId=item.desktopID;const symbol=document.createElement('span');symbol.className='device-symbol';symbol.innerHTML=icons.desktop;const body=document.createElement('div');const title=document.createElement('div');title.className='device-title';const link=document.createElement('a');link.className='device-name';link.href='/d/'+encodeURIComponent(item.desktopID)+'/';link.target='_blank';link.rel='noopener noreferrer';link.textContent=item.label||item.desktopID;const state=document.createElement('span');state.className='badge'+(item.online?' online':'');const dot=document.createElement('span');dot.className='dot';const stateText=document.createElement('span');stateText.textContent=tr(item.online?'online':'offline');state.append(dot,stateText);title.append(link,state);const id=document.createElement('div');id.className='device-id';const code=document.createElement('code');code.className='mono';code.textContent=item.desktopID;code.title=item.desktopID;const copy=document.createElement('button');copy.type='button';copy.setAttribute('aria-label',tr('copyID'));copy.innerHTML=icons.copy;copy.onclick=()=>copyText(item.desktopID);id.append(code,copy);const date=document.createElement('div');date.className='device-date';date.textContent=tr('registered')+' '+new Date(item.createdAt).toLocaleDateString(locale==='zh'?'zh-CN':'en');body.append(title,id,date);const actions=document.createElement('div');actions.className='device-actions';const button=document.createElement('button');button.type='button';button.className='subtle danger';button.setAttribute('aria-label',tr('revoke')+' '+(item.label||item.desktopID));button.innerHTML=icons.revoke;const label=document.createElement('span');label.className='action-label';label.textContent=tr('revoke');button.append(label);button.disabled=busy;button.onclick=()=>{if(busy)return;revokingID=item.desktopID;$('revokeTarget').textContent=item.label||item.desktopID;$('revokeDialog').showModal()};actions.append(button);row.append(symbol,body,actions);list.append(row);}}
+async function copyText(text){try{await navigator.clipboard.writeText(text);notice(tr('copied'))}catch{notice(tr('copyFailed'),true)}}
+$('lang').onchange=()=>{locale=$('lang').value;notice('');localize()};$('relayOrigin').textContent=location.origin;$('copyURL').onclick=()=>copyText(location.origin);$('copyToken').onclick=()=>copyText($('token').value);$('toggleToken').onclick=()=>{$('token').type=$('token').type==='password'?'text':'password';localize()};$('dismissCredential').onclick=forgetCredential;$('disconnect').onclick=()=>{signOut();notice('')};
+$('login').onsubmit=async event=>{event.preventDefault();if(busy)return;accessController=new AbortController();secret=$('secret').value;$('secret').value='';setBusy(true);try{await load();notice('')}catch(error){signOut();if(error.name!=='AbortError')notice(error.message,true)}finally{setBusy(false)}};
+$('refresh').onclick=async()=>{if(busy)return;setBusy(true);try{await load();notice(tr('loaded'))}catch(error){if(error.name!=='AbortError')notice(error.message,true)}finally{setBusy(false)}};
+$('register').onsubmit=async event=>{event.preventDefault();if(busy)return;setBusy(true);try{const result=await api('',{method:'POST',body:JSON.stringify({desktopID:$('desktopID').value.trim(),label:$('label').value.trim()})});createdCredential=result;$('token').value=result.token;$('token').type='password';$('credentialID').textContent=result.desktopID;$('credentialURL').textContent=location.origin;$('credential').hidden=false;$('register').reset();localize();notice(tr('created'));await load();$('credential').scrollIntoView({block:'start',behavior:'smooth'})}catch(error){if(error.name!=='AbortError')notice(error.message,true)}finally{setBusy(false)}};
+$('revokeDialog').addEventListener('close',async()=>{if($('revokeDialog').returnValue!=='confirm'||!revokingID)return;const id=revokingID;revokingID='';setBusy(true);try{await api('/'+encodeURIComponent(id),{method:'DELETE'});if(createdCredential&&createdCredential.desktopID===id)forgetCredential();await load();notice(tr('revoked'))}catch(error){if(error.name!=='AbortError')notice(error.message,true)}finally{setBusy(false)}});
+window.addEventListener('pagehide',signOut);
+localize();fetch('/version',{cache:'no-store'}).then(response=>response.ok?response.json():null).then(info=>{if(info&&typeof info.version==='string')$('version').textContent='Pudding Relay · '+info.version}).catch(()=>{});
+</script>
+</body></html>
