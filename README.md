@@ -114,7 +114,7 @@ The desktop gateway owns phone pairing/login and route authorization. The relay 
 
 Connect outbound WSS to `/tunnel` using subprotocol `pudding-relay.v1`. Within five seconds send text JSON `{"type":"hello","protocol":1,"desktopID":"…","token":"…"}`; successful authentication returns `{"type":"hello","protocol":1,"desktopID":"…"}`. The token is never placed in the URL. One desktop may have one active tunnel. The relay sends a standard WebSocket Ping every 30 seconds; failure to receive Pong within 10 seconds closes the tunnel and wakes active HTTP streams. Native browser/Node WebSocket clients answer Pong automatically. Version mismatch or invalid credentials closes it.
 
-Every subsequent frame has string `id`:
+Every subsequent frame has string `id`. The forwarded `path` preserves URL encoding, including `%3A` in canonical input-request IDs; encoded separators, double encoding, NUL and dot traversal are rejected:
 
 | Direction | Frames |
 | --- | --- |

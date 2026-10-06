@@ -619,3 +619,140 @@ func TestStandardWebSocketPongKeepsDesktopAlive(t *testing.T) {
 		t.Fatal("healthy tunnel canceled")
 	}
 }
+
+func TestEncodedInputRequestIDHTTPAndWire(t *testing.T) {
+	_, relayServer, token := testRelay(t)
+	c := dialDesktop(t, relayServer, token)
+	canonicalID := "turn_1:call_2"
+	escapedID := url.PathEscape(canonicalID)
+	// net/url PathEscape permits a colon in path segments; browser encodeURIComponent does not.
+	escapedID = strings.ReplaceAll(escapedID, ":", "%3A")
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/sessions/session/input-requests/"+canonicalID {
+			http.Error(w, "wrong canonical input ID", 400)
+			return
+		}
+		if r.URL.EscapedPath() != "/sessions/session/input-requests/"+escapedID {
+			http.Error(w, "escaped input ID lost", 400)
+			return
+		}
+		data, _ := io.ReadAll(r.Body)
+		writeJSON(w, map[string]string{"requestID": canonicalID, "body": string(data)})
+	}))
+	defer upstream.Close()
+	bridgeErrors := make(chan error, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		var request frame
+		var body []byte
+		for {
+			_, data, err := c.Read(ctx)
+			if err != nil {
+				bridgeErrors <- err
+				return
+			}
+			var f frame
+			if err = json.Unmarshal(data, &f); err != nil {
+				bridgeErrors <- err
+				return
+			}
+			switch f.Type {
+			case "request":
+				if f.Path != "/api/sessions/session/input-requests/"+escapedID {
+					bridgeErrors <- fmt.Errorf("wire path %q", f.Path)
+					return
+				}
+				request = f
+				body = nil
+			case "request_data":
+				chunk, err := base64.StdEncoding.DecodeString(f.Data)
+				if err != nil {
+					bridgeErrors <- err
+					return
+				}
+				body = append(body, chunk...)
+				ack, _ := json.Marshal(frame{Type: "ack", ID: f.ID, Direction: "request"})
+				if err = c.Write(ctx, websocket.MessageText, ack); err != nil {
+					bridgeErrors <- err
+					return
+				}
+			case "request_end":
+				req, _ := http.NewRequest(request.Method, upstream.URL+strings.TrimPrefix(request.Path, "/api"), bytes.NewReader(body))
+				response, err := upstream.Client().Do(req)
+				if err != nil {
+					bridgeErrors <- err
+					return
+				}
+				reply, err := io.ReadAll(response.Body)
+				response.Body.Close()
+				if err != nil {
+					bridgeErrors <- err
+					return
+				}
+				for _, replyFrame := range []frame{{Type: "response", ID: f.ID, Status: response.StatusCode}, {Type: "response_data", ID: f.ID, Data: base64.StdEncoding.EncodeToString(reply)}} {
+					encoded, _ := json.Marshal(replyFrame)
+					if err = c.Write(ctx, websocket.MessageText, encoded); err != nil {
+						bridgeErrors <- err
+						return
+					}
+				}
+			case "ack":
+				if f.Direction == "response" {
+					encoded, _ := json.Marshal(frame{Type: "response_end", ID: f.ID})
+					if err = c.Write(ctx, websocket.MessageText, encoded); err != nil {
+						bridgeErrors <- err
+						return
+					}
+				}
+			}
+		}
+	}()
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		payload := ""
+		if method == http.MethodPost {
+			payload = `{"answers":{"reply":"yes"}}`
+		}
+		req, _ := http.NewRequest(method, relayServer.URL+"/d/desktop-one/api/sessions/session/input-requests/"+escapedID, strings.NewReader(payload))
+		requestCtx, requestCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer requestCancel()
+		req = req.WithContext(requestCtx)
+		response, err := relayServer.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(response.Body)
+		response.Body.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if response.StatusCode != 200 {
+			t.Fatalf("encoded input request HTTP status %d, body %s", response.StatusCode, data)
+		}
+		var value map[string]string
+		if err = json.Unmarshal(data, &value); err != nil || value["requestID"] != canonicalID || value["body"] != payload {
+			t.Fatalf("canonical reply %s %v", data, err)
+		}
+	}
+	select {
+	case err := <-bridgeErrors:
+		t.Fatal(err)
+	default:
+	}
+}
+
+func TestRelayRejectsDangerousPathEncodingsBeforeRouting(t *testing.T) {
+	_, server, _ := testRelay(t)
+	client := server.Client()
+	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	for _, suffix := range []string{"turn%2Fcall", "turn%2fcall", "turn%5Ccall", "turn%253Acall", "turn%00call", "%2E%2E/call", "%2e/call", "../call", "./call", "turn%FFcall"} {
+		response, err := client.Get(server.URL + "/d/desktop-one/api/sessions/session/input-requests/" + suffix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != 400 {
+			t.Fatalf("%s status %d (must reject before redirect or tunnel routing)", suffix, response.StatusCode)
+		}
+	}
+}

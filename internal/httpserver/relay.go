@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/coder/websocket"
 )
@@ -107,7 +108,15 @@ func NewRelay(build BuildInfo, cfg Config) (*Relay, http.Handler, error) {
 		}
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 	})
-	return relay, mux, nil
+	// Validate before ServeMux can canonicalize dot segments into redirects.
+	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if strings.HasPrefix(req.URL.Path, "/d/") && !validRemotePath(req.URL) {
+			errorJSON(w, http.StatusBadRequest, "invalid path")
+			return
+		}
+		mux.ServeHTTP(w, req)
+	})
+	return relay, handler, nil
 }
 func (r *Relay) Close() {
 	r.mu.Lock()
@@ -303,6 +312,24 @@ func cleanHeaders(in http.Header) map[string]string {
 	}
 	return out
 }
+func validRemotePath(u *url.URL) bool {
+	if strings.Contains(u.Path, "\\") || !utf8.ValidString(u.Path) {
+		return false
+	}
+	escaped := strings.ToLower(u.EscapedPath())
+	for _, forbidden := range []string{"%2f", "%5c", "%25", "%00"} {
+		if strings.Contains(escaped, forbidden) {
+			return false
+		}
+	}
+	for _, segment := range strings.Split(u.Path, "/") {
+		if segment == "." || segment == ".." {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *Relay) forward(w http.ResponseWriter, req *http.Request) {
 	id := req.PathValue("desktopID")
 	if !desktopIDPattern.MatchString(id) {
@@ -315,10 +342,9 @@ func (r *Relay) forward(w http.ResponseWriter, req *http.Request) {
 		r.assets(w, req, prefix, path)
 		return
 	}
-	if req.URL.RawPath != "" || strings.Contains(path, "\\") {
-		errorJSON(w, 400, "invalid path")
-		return
-	}
+	// Preserve browser encoding (notably request IDs containing %3A) on the
+	// wire; the desktop gateway and core decode each segment at their boundary.
+	path = "/" + strings.SplitN(req.URL.EscapedPath(), "/", 4)[3]
 	r.mu.Lock()
 	t := r.tunnels[id]
 	r.mu.Unlock()

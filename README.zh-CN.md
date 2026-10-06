@@ -114,7 +114,7 @@ Admin API 要求 `Authorization: Bearer <管理员密钥>`；若传入 `Origin`�
 
 桌面向 `/tunnel` 主动建立 WSS，子协议为 `pudding-relay.v1`。五秒内发送文本 JSON `{"type":"hello","protocol":1,"desktopID":"…","token":"…"}`，成功后返回 `{"type":"hello","protocol":1,"desktopID":"…"}`。token 不放入 URL。每个桌面仅有一个活动隧道。relay 每 30 秒发送标准 WebSocket Ping，10 秒内未收到 Pong 则关闭隧道并唤醒活动 HTTP 流；原生浏览器与 Node WebSocket 自动回复 Pong。版本不匹配或凭据无效时关闭连接。
 
-其余每帧均含字符串 `id`：
+其余每帧均含字符串 `id`。转发的 `path` 保留 URL 编码，包括 canonical 补答请求 ID 中的 `%3A`；编码分隔符、双重编码、NUL 和目录穿越会被拒绝：
 
 | 方向 | 帧 |
 | --- | --- |
