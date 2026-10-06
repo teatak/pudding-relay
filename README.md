@@ -76,6 +76,8 @@ relay.example.com {
 
 The proxy must support WebSocket upgrade and unbuffered SSE, permit attachment sizes appropriate to your deployment, and avoid logging credential/cookie/body contents. Do not expose the relay's internal HTTP listener to the internet. Provision trusted HTTPS for real phones. Keep the admin secret file outside version control. To rotate it, replace the file and restart the relay. Desktop credentials are independently revoked in admin.
 
+This feature has not been released; use a compatible desktop build. Its package includes the matching mobile assets: on macOS, `Pudding.app/Contents/Resources/app/web/dist/remote`; on Windows, `<installation directory>/resources/app/web/dist/remote`. Copy the directory contents into `mobile-dist` to deploy without private source access. Maintainers can also build `web/dist/remote` from the matching desktop source. No released asset bundle or registry image is promised.
+
 To install mobile assets, mount the shared build read-only and set `PUDDING_RELAY_ASSETS_DIR` to that container path, for example an override:
 
 ```yaml

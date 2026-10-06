@@ -76,6 +76,8 @@ relay.example.com {
 
 代理须支持 WebSocket upgrade 和不缓冲的 SSE，允许适合部署的附件大小，且不记录凭据、cookie、正文内容。不要将 relay 内部 HTTP 监听直接暴露到公网。真实手机需要受信任的 HTTPS。密钥文件不得提交到版本库；轮换时替换文件并重启 relay。桌面凭据通过 admin 独立撤销。
 
+本功能尚未发布，请使用兼容的桌面构建。桌面包内含匹配版本的手机资源：macOS 路径为 `Pudding.app/Contents/Resources/app/web/dist/remote`，Windows 为 `<安装目录>/resources/app/web/dist/remote`。将目录内容复制到 `mobile-dist`，即可在无需私有源码的情况下部署；维护者也可从匹配的桌面源码构建 `web/dist/remote`。此处不承诺已有公开资源包或镜像。
+
 安装手机资源时，只读挂载共享构建，并将 `PUDDING_RELAY_ASSETS_DIR` 设为容器路径，例如覆盖配置：
 
 ```yaml
