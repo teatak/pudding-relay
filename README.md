@@ -37,6 +37,8 @@ The public [Docker Hub image](https://hub.docker.com/r/teatak/pudding-relay) inc
 Install Docker Engine and Docker Compose v2, then run on the server:
 
 ```sh
+mkdir -p pudding-relay
+cd pudding-relay
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh | sh
 ```
 
@@ -49,15 +51,15 @@ curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.s
   | env INSTALL_DIR=/opt/pudding-relay PORT=9623 sh
 ```
 
-The default directory is `pudding-relay/` under the current directory. Installation creates `.env`, `compose.yaml`, `makefile` and `secrets/admin-secret`. The directory must be writable; system paths such as `/opt` require suitable permissions. Registrations live in the Compose named volume `relay_data`, outside the image. Reinstallation retains the secret, settings and registrations. Explicit environment arguments update their corresponding settings. `.env` is read as data, never executed as shell code.
+Installation defaults to the current directory; it does not create a `pudding-relay/` subdirectory. Installation creates `.env`, `compose.yaml`, `makefile` and `secrets/admin-secret`. The directory must be writable; system paths such as `/opt` require suitable permissions. Registrations live in the Compose named volume `relay_data`, outside the image. Reinstallation retains the secret, settings and registrations. Explicit environment arguments update their corresponding settings. `.env` is read as data, never executed as shell code.
 
 | Parameter | Default / meaning |
 | --- | --- |
 | `TRUSTED_PROXIES` | Optional comma-separated trusted proxy CIDRs; empty trusts no forwarding headers |
-| `INSTALL_DIR` | `$PWD/pudding-relay`; reuse the same directory for reinstallation |
+| `INSTALL_DIR` | `$PWD`; reuse the same directory for reinstallation |
 | `IMAGE` | `teatak/pudding-relay:latest`; a fixed tag/digest may be supplied |
 | `PORT` | Host HTTP port, default `9623` |
-| `BIND_ADDRESS` | `127.0.0.1` by default; select a reachable private host IP if needed |
+| `BIND_ADDRESS` | `0.0.0.0` by default; set a specific host IP to restrict access |
 | `NETWORK` | Optional existing Docker network; empty uses Compose's own network |
 
 The following shortcuts require `make`; the corresponding `docker compose` commands also work directly in this directory.

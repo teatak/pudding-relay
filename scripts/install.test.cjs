@@ -72,3 +72,16 @@ test('noninteractive installs need no public URL and reject invalid configuratio
   assert.doesNotMatch(fs.readFileSync(path.join(f.directory, '.env'), 'utf8'), /PUBLIC_URL/);
   assert.match(fs.readFileSync(path.join(f.directory, '.env'), 'utf8'), /PORT=9623\n/);
 });
+
+test('default installation uses the working directory without creating a nested directory', t => {
+  const f = fixture(t);
+  fs.mkdirSync(f.directory);
+  const env = { ...f.env };
+  delete env.INSTALL_DIR;
+  const result = spawnSync('sh', [installer], { cwd: f.directory, env, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  for (const file of ['.env', 'compose.yaml', 'makefile', 'secrets/admin-secret']) {
+    assert.equal(fs.existsSync(path.join(f.directory, file)), true, file);
+  }
+  assert.equal(fs.existsSync(path.join(f.directory, 'pudding-relay')), false);
+});

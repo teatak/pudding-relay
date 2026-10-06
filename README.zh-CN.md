@@ -37,6 +37,8 @@ Pudding 支持两个可独立启用、同时使用的入口：
 先安装 Docker Engine 和 Docker Compose v2，然后在服务器运行：
 
 ```sh
+mkdir -p pudding-relay
+cd pudding-relay
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh | sh
 ```
 
@@ -49,15 +51,15 @@ curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.s
   | env INSTALL_DIR=/opt/pudding-relay PORT=9623 sh
 ```
 
-默认安装到当前目录下的 `pudding-relay/`，会生成 `.env`、`compose.yaml`、`makefile` 和 `secrets/admin-secret`。目录需对当前用户可写；`/opt` 等系统目录需相应权限。登记数据使用 Compose 命名卷 `relay_data`，不会放进镜像。重复运行保留密钥、配置和登记数据；显式传入的参数更新对应配置。`.env` 按数据读取，不作为 shell 脚本执行。
+默认安装到当前目录，不额外创建 `pudding-relay/` 子目录。会生成 `.env`、`compose.yaml`、`makefile` 和 `secrets/admin-secret`。目录需对当前用户可写；`/opt` 等系统目录需相应权限。登记数据使用 Compose 命名卷 `relay_data`，不会放进镜像。重复运行保留密钥、配置和登记数据；显式传入的参数更新对应配置。`.env` 按数据读取，不作为 shell 脚本执行。
 
 | 参数 | 默认值／含义 |
 | --- | --- |
 | `TRUSTED_PROXIES` | 可选，逗号分隔的可信代理 CIDR；默认空，不信任任何转发头 |
-| `INSTALL_DIR` | `$PWD/pudding-relay`；以后重复安装使用同一目录 |
+| `INSTALL_DIR` | `$PWD`；以后重复安装使用同一目录 |
 | `IMAGE` | `teatak/pudding-relay:latest`；可改用固定 tag／digest |
 | `PORT` | 宿主机 HTTP 端口，默认 `9623` |
-| `BIND_ADDRESS` | 默认 `127.0.0.1`；仅本机访问，按需要改为可达的内网 IP |
+| `BIND_ADDRESS` | 默认 `0.0.0.0`；可从宿主机 IP 访问，亦可指定具体宿主机 IP |
 | `NETWORK` | 可选，加入已存在的 Docker 网络；留空使用 Compose 自身网络 |
 
 以下快捷命令需要 `make`；也可以在同目录直接使用对应的 `docker compose` 命令。

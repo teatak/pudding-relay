@@ -7,7 +7,7 @@ command -v docker >/dev/null 2>&1 || fail 'Docker is required.' '请先安装 Do
 docker compose version >/dev/null 2>&1 || fail 'Docker Compose v2 is required.' '请先安装 Docker Compose v2。'
 docker info >/dev/null 2>&1 || fail 'Cannot connect to Docker.' '无法连接 Docker，请确认服务及当前用户权限。'
 
-INSTALL_DIR="${INSTALL_DIR:-$PWD/pudding-relay}"
+INSTALL_DIR="${INSTALL_DIR:-$PWD}"
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 setting() {
@@ -21,7 +21,7 @@ IMAGE="${IMAGE:-teatak/pudding-relay:latest}"
 PORT="${PORT-$(setting PORT)}"
 PORT="${PORT:-9623}"
 BIND_ADDRESS="${BIND_ADDRESS-$(setting BIND_ADDRESS)}"
-BIND_ADDRESS="${BIND_ADDRESS:-127.0.0.1}"
+BIND_ADDRESS="${BIND_ADDRESS:-0.0.0.0}"
 TRUSTED_PROXIES="${TRUSTED_PROXIES-$(setting TRUSTED_PROXIES)}"
 NETWORK="${NETWORK-$(setting NETWORK)}"
 
