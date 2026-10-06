@@ -4,3 +4,7 @@
 .env.*
 !.env.example
 .DS_Store
+
+/data/
+/secrets/
+/mobile-dist/

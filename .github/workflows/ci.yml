@@ -22,9 +22,13 @@ jobs:
       - run: ./bin/pudding-relay --version
 
   docker:
+    env:
+      PUDDING_RELAY_PUBLIC_URL: https://relay.example
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - name: Create test admin secret
+        run: mkdir -p secrets && openssl rand -hex 32 > secrets/admin-secret
       - run: docker compose config --quiet
       - name: Build and start
         run: docker compose up --build --detach --wait --wait-timeout 120
@@ -37,4 +41,4 @@ jobs:
         run: docker compose logs
       - name: Stop containers
         if: always()
-        run: docker compose down
+        run: docker compose down --volumes

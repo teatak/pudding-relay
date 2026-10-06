@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -22,6 +23,10 @@ var (
 
 func main() {
 	listen := flag.String("listen", "127.0.0.1:8080", "HTTP listen address / HTTP 监听地址")
+	publicURL := flag.String("public-url", os.Getenv("PUDDING_RELAY_PUBLIC_URL"), "Public HTTPS origin / 公网 HTTPS 地址")
+	dataFile := flag.String("data-file", "data/registrations.json", "Registration digest file / 登记摘要文件")
+	assetsDir := flag.String("assets-dir", os.Getenv("PUDDING_RELAY_ASSETS_DIR"), "Mobile Web build directory / 手机 Web 构建目录")
+	insecure := flag.Bool("allow-insecure-loopback", false, "Allow HTTP loopback for local tests only / 仅本地测试允许 HTTP loopback")
 	showVersion := flag.Bool("version", false, "Print build version / 显示构建版本")
 	flag.Parse()
 	if flag.NArg() != 0 {
@@ -35,16 +40,37 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if err := serve(ctx, *listen); err != nil {
+	secretFile := os.Getenv("PUDDING_RELAY_ADMIN_SECRET_FILE")
+	if secretFile == "" {
+		slog.Error("PUDDING_RELAY_ADMIN_SECRET_FILE is required")
+		os.Exit(1)
+	}
+	secret, err := os.ReadFile(secretFile)
+	if err != nil {
+		slog.Error("cannot read admin secret file")
+		os.Exit(1)
+	}
+	store, err := httpserver.OpenStore(*dataFile)
+	if err != nil {
+		slog.Error("cannot open registration store")
+		os.Exit(1)
+	}
+	cfg := httpserver.Config{PublicURL: *publicURL, AdminSecret: strings.TrimSpace(string(secret)), Store: store, AssetsDir: *assetsDir, AllowInsecureLoopback: *insecure}
+	if err := serve(ctx, *listen, cfg); err != nil {
 		slog.Error("relay stopped", "error", err)
 		os.Exit(1)
 	}
 }
 
-func serve(ctx context.Context, address string) error {
+func serve(ctx context.Context, address string, cfg httpserver.Config) error {
+	relay, handler, err := httpserver.NewRelay(httpserver.BuildInfo{Version: version, Commit: commit}, cfg)
+	if err != nil {
+		return err
+	}
+	defer relay.Close()
 	server := &http.Server{
 		Addr:              address,
-		Handler:           httpserver.NewHandler(httpserver.BuildInfo{Version: version, Commit: commit}),
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    1 << 20,
@@ -60,6 +86,7 @@ func serve(ctx context.Context, address string) error {
 		return fmt.Errorf("listen: %w", err)
 	case <-ctx.Done():
 		slog.Info("shutting down")
+		relay.Close()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
