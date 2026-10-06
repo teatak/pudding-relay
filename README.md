@@ -101,7 +101,7 @@ HTTP is permitted only for an explicitly opted-in loopback test origin. Public d
 | `--allow-insecure-loopback` | Explicit HTTP loopback test opt-in |
 | `PUDDING_RELAY_ADMIN_SECRET_FILE` | Required admin secret file, at least 32 bytes after trimming |
 
-`make build` produces `bin/pudding-relay` and embeds the Git commit; `VERSION` and `COMMIT` can override build metadata. `--version` prints it without requiring server configuration. SIGINT/SIGTERM closes tunnels, wakes active streams and shuts down HTTP. The registry is atomically replaced; POSIX systems use file mode `0600` and newly created directory mode `0700`. Windows uses the data directory’s ACL permissions. Back it up securely; lost credentials must be revoked and recreated.
+`make build` produces `bin/pudding-relay` and embeds the Git commit; the version comes from `VERSION`, and `COMMIT` can override commit metadata. `--version` prints it without requiring server configuration. SIGINT/SIGTERM closes tunnels, wakes active streams and shuts down HTTP. The registry is atomically replaced; POSIX systems use file mode `0600` and newly created directory mode `0700`. Windows uses the data directory’s ACL permissions. Back it up securely; lost credentials must be revoked and recreated.
 
 ## Docker and public HTTPS
 
@@ -190,9 +190,35 @@ WEB_LEGAL_DIR=/path/to/pudding/dist/legal \
 make docker-build
 ```
 
-`make docker-publish` uses the same inputs to push Linux amd64/arm64 images. The default reference is `teatak/pudding-relay:latest`; `IMAGE` and `VERSION` override it. The current Docker user needs push access. `scripts/build-image.sh` checks Pudding's base marker and license files, then supplies binary assets through a named context, excluding private source and source maps.
+`VERSION` is the single release-version source, initially `0.1.0`. `make docker-publish` uses the same inputs for Linux amd64/arm64 and creates both `latest` and fixed-version tags. `IMAGE` changes the target image reference. The current Docker user needs push access. `scripts/build-image.sh` checks Pudding's base marker and license files, then supplies binary assets through a named context, excluding private source and source maps.
 
 The standalone Go image builds with `docker build --target server .`; the complete distribution needs the `browser` context. CI UI fixtures only test installation and persistence; they are never published as release assets.
+
+## Versioning and releases
+
+`make build`, `make run` and Docker builds read the root `VERSION` file. Both `--version` and `/version` report that release version.
+
+```sh
+make version-patch   # 0.1.0 -> 0.1.1; update VERSION only
+make version-minor   # 0.1.0 -> 0.2.0
+make version-major   # 0.1.0 -> 1.0.0
+make release-current # Publish the prepared, unreleased VERSION
+make release         # Alias for release-patch
+make release-patch
+make release-minor
+make release-major
+```
+
+Commit source on main and provide the browser assets/notices above and Docker Hub push access. The release script fetches main/tags, runs tests, commits a version bump if needed, pushes the multi-architecture image, then atomically pushes main and Git tag `vX.Y.Z`. The first patch release uses the prepared version; an already tagged current version increments patch. Published versions reject repeat publication. A failed image push creates no Git tag; retry retains the prepared version.
+
+Install a fixed version:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
+  | env IMAGE=teatak/pudding-relay:0.1.0 sh
+```
+
+`latest` follows new releases. A fixed tag remains on that version; `make upgrade` keeps the image reference selected at installation.
 
 ## Verification
 

@@ -1,7 +1,7 @@
 GO ?= go
-VERSION ?= dev
+RELAY_VERSION := $(shell cat VERSION)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
-LDFLAGS = -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)
+LDFLAGS = -s -w -X main.version=$(RELAY_VERSION) -X main.commit=$(COMMIT)
 
 .PHONY: build run test check fmt
 
@@ -9,7 +9,7 @@ build:
 	$(GO) build -trimpath -ldflags "$(LDFLAGS)" -o bin/pudding-relay ./cmd/pudding-relay
 
 run:
-	$(GO) run ./cmd/pudding-relay
+	$(GO) run -ldflags "$(LDFLAGS)" ./cmd/pudding-relay $(ARGS)
 
 test:
 	$(GO) test -race ./...
@@ -25,13 +25,32 @@ fmt:
 .PHONY: test-install docker-build docker-publish smoke-install
 
 test-install:
-	node --test scripts/install.test.cjs
+	node --test scripts/*.test.cjs
 
 docker-build:
 	./scripts/build-image.sh --load
 
 docker-publish:
-	./scripts/build-image.sh --platform linux/amd64,linux/arm64 --push
+	./scripts/release.sh current
 
 smoke-install:
 	node scripts/install-smoke.cjs
+
+.PHONY: version-patch version-minor version-major release release-current release-patch release-minor release-major
+
+version-patch:
+	./scripts/version.sh patch
+version-minor:
+	./scripts/version.sh minor
+version-major:
+	./scripts/version.sh major
+
+release: release-patch
+release-current:
+	./scripts/release.sh current
+release-patch:
+	./scripts/release.sh patch
+release-minor:
+	./scripts/release.sh minor
+release-major:
+	./scripts/release.sh major

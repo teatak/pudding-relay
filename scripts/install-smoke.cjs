@@ -46,11 +46,14 @@ async function main() {
   const headers = { Authorization: `Bearer ${secret.trim()}`, Origin: env.PUBLIC_URL, 'Content-Type': 'application/json' };
   const endpoint = `http://127.0.0.1:${relayPort}`;
   assert.equal((await fetch(`${endpoint}/healthz`)).status, 200);
+  const expectedVersion = fs.readFileSync(path.resolve(__dirname, '../VERSION'), 'utf8').trim();
+  assert.equal((await (await fetch(`${endpoint}/version`)).json()).version, expectedVersion);
+  assert.ok((await docker('run', '--rm', image, '--version')).startsWith(`pudding-relay ${expectedVersion} (`));
   assert.match(await (await fetch(`${endpoint}/admin`)).text(), /Pudding/);
   const config = JSON.parse(await docker('compose', '--project-directory', root, '-f', path.join(root, 'compose.yaml'), 'config', '--format', 'json'));
   assert.equal(config.services.relay.read_only, true);
   assert.equal(config.services.relay.ports[0].host_ip, '127.0.0.1');
-  checks.push('first install, health/admin, bundled UI check, loopback binding and non-root image');
+  checks.push('first install, CLI/API version, health/admin, bundled UI check, loopback binding and non-root image');
   const response = await fetch(`${endpoint}/admin/api/desktops`, { method: 'POST', headers, body: JSON.stringify({ desktopID: 'desktop_install_smoke', label: 'Install smoke' }) });
   assert.equal(response.status, 201); const grant = await response.json();
   assert.ok(grant.token);

@@ -1,16 +1,15 @@
 # syntax=docker/dockerfile:1
 FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
 WORKDIR /src
-COPY go.mod go.sum ./
+COPY go.mod go.sum VERSION ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 ARG TARGETOS
 ARG TARGETARCH
-ARG VERSION=dev
 ARG COMMIT=unknown
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
-    -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" \
+    -ldflags "-s -w -X main.version=$(cat VERSION) -X main.commit=${COMMIT}" \
     -o /out/pudding-relay ./cmd/pudding-relay
 
 RUN mkdir -p /out/licenses && cp "$(go list -m -f '{{.Dir}}' github.com/coder/websocket)/LICENSE.txt" /out/licenses/websocket-LICENSE.txt

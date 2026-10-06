@@ -101,7 +101,7 @@ HTTP 仅允许显式启用的 loopback 测试入口。公网地址必须为 HTTP
 | `--allow-insecure-loopback` | 显式允许 HTTP loopback 测试 |
 | `PUDDING_RELAY_ADMIN_SECRET_FILE` | 必需的管理员密钥文件，去除首尾空白后至少 32 字节 |
 
-`make build` 输出 `bin/pudding-relay` 并嵌入 Git 提交，可用 `VERSION`、`COMMIT` 覆盖构建信息。`--version` 无需服务配置即可显示版本。SIGINT/SIGTERM 关闭隧道、唤醒活动流并关闭 HTTP。登记文件原子替换；POSIX 系统文件权限为 `0600`，新建目录为 `0700`。Windows 使用数据目录的 ACL 权限。安全备份该文件；遗失凭据需撤销后重建。
+`make build` 输出 `bin/pudding-relay` 并嵌入 Git 提交，版本来自 `VERSION` 文件，`COMMIT` 可覆盖提交元数据。`--version` 无需服务配置即可显示版本。SIGINT/SIGTERM 关闭隧道、唤醒活动流并关闭 HTTP。登记文件原子替换；POSIX 系统文件权限为 `0600`，新建目录为 `0700`。Windows 使用数据目录的 ACL 权限。安全备份该文件；遗失凭据需撤销后重建。
 
 ## Docker 与公网 HTTPS
 
@@ -190,9 +190,35 @@ WEB_LEGAL_DIR=/path/to/pudding/dist/legal \
 make docker-build
 ```
 
-`make docker-publish` 使用同样的输入发布 Linux amd64／arm64 镜像；默认镜像为 `teatak/pudding-relay:latest`，可通过 `IMAGE`、`VERSION` 覆盖。需要当前 Docker 用户有目标仓库的推送权限。`scripts/build-image.sh` 校验 Pudding 的 base 标记和许可，将编译资源通过独立构建 context 放入镜像，不复制私有源码或 source map。
+`VERSION` 是版本号的唯一来源，初始版本为 `0.1.0`。`make docker-publish` 使用同样的输入发布 Linux amd64／arm64 镜像，同时生成 `latest` 和固定版本标签；可通过 `IMAGE` 指定镜像目标。需要当前 Docker 用户有目标仓库的推送权限。`scripts/build-image.sh` 校验 Pudding 的 base 标记和许可，将编译资源通过独立构建 context 放入镜像，不复制私有源码或 source map。
 
 源码 Go 服务镜像可用 `docker build --target server .` 独立构建；完整发行 target 需要 `browser` context。CI 的资源 fixture 只用于安装及持久化验收，不作为发行资源发布。
+
+## 版本与发版
+
+`make build`、`make run` 和 Docker 构建均读取根目录 `VERSION`，`--version` 与 `/version` 显示相同正式版本。
+
+```sh
+make version-patch   # 0.1.0 -> 0.1.1，仅更新 VERSION
+make version-minor   # 0.1.0 -> 0.2.0
+make version-major   # 0.1.0 -> 1.0.0
+make release-current # 发布当前尚未发版的 VERSION
+make release         # 等同 release-patch
+make release-patch
+make release-minor
+make release-major
+```
+
+发版前需要在 main 提交源码，并提供上方浏览器资源／许可目录及 Docker Hub 推送权限。脚本同步远端与 Git tags、执行测试、按需提交版本更新、推送双架构镜像，然后原子推送 main 与 `vX.Y.Z` Git tag。首次 patch 发版使用当前准备好的版本；当前版本已有 tag 时递增 patch。已发版版本拒绝重复发布，镜像失败时不创建 Git tag；修复后重试保留已准备的版本。
+
+固定版本安装：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
+  | env IMAGE=teatak/pudding-relay:0.1.0 sh
+```
+
+`latest` 跟随新发行版；固定标签保持该版本，`make upgrade` 沿用安装时选择的镜像。
 
 ## 验证
 
