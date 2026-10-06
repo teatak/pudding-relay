@@ -4,11 +4,11 @@
 
 独立、可自行部署的 Go 中继，让手机浏览器在局域网外访问 Pudding 桌面端。采用 Apache-2.0 许可证，无 Cloudflare 运行时依赖。
 
-服务已实现受鉴权的反向隧道、有界 REST/SSE 转发、持久化桌面凭据摘要，以及轻量中英双语管理页。手机访问需要兼容的 Pudding 桌面网关和共享手机 Web 构建。手机资源单独安装；构建 Go 服务无需访问私有桌面仓库。
+服务已实现受鉴权的反向隧道、有界 REST/SSE 转发、持久化桌面凭据摘要，以及轻量中英双语管理页。手机访问需要兼容的 Pudding 桌面网关和共享手机 Web 构建。Docker 发行镜像包含匹配的浏览器资源，用户无需手动复制。Go 服务及其开发镜像仍可独立构建，无需访问私有桌面仓库。
 
 ## 接入流程
 
-1. 使用 Docker 部署 relay，准备私有管理员密钥文件、公网 HTTPS 域名和匹配的浏览器资源。下方提供部署命令与反向代理示例。
+1. 按下方一键安装部署 relay，准备可访问的外部 HTTPS 地址。安装器会生成管理员密钥并启动含浏览器资源的镜像。
 2. 在 Pudding **设置 → 远程访问**复制桌面 ID。打开自己 relay 的 `/admin`，登记此 ID，复制仅显示一次的桌面接入凭据。
 3. 在 Pudding 中继设置填写 relay HTTPS origin 和接入凭据，保存并等待“已连接”。
 4. 在电脑点击“生成授权二维码”，手机扫码后点“连接”。无需输入设备名或再次在电脑批准；授权码五分钟有效，只能使用一次。
@@ -29,6 +29,53 @@ Pudding 支持两个可独立启用、同时使用的入口：
 业务请求保留 REST，会话事件保留支持 `Last-Event-ID` 续传的 SSE。会话、任务、审批和文件留在电脑。relay 仅持久化桌面 ID、名称、创建时间及 SHA-256 凭据摘要，不持久化会话数据，不记录 token、cookie、请求正文或消息内容。HTTPS/WSS 保护每段连接，不代表跨中继端到端加密，用户需要信任部署者。仅运行一个 relay 实例，独占登记文件。
 
 手机首版覆盖会话、流式结果、附件、取消、用户补答和 Pudding 审批；完整远程桌面控制、系统原生授权、语音与离线执行不在范围内。Pudding 须保持运行，入口须可达。直连不依赖中继可用性，模型和工具仍可能需要外网。
+
+## 一键安装
+
+安装器及容器验收已完成。含浏览器资源的公开镜像正在等待发布确认；`teatak/pudding-relay:latest` 发布后，下方命令即可直接使用。
+
+先安装 Docker Engine 和 Docker Compose v2，然后在服务器运行：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh | sh
+```
+
+首次运行会询问公网 HTTPS 地址，例如 `https://relay.example.com`。Relay 自身提供 HTTP 后端，外部 HTTPS 由现有反向代理处理。安装成功会显示管理地址和管理员密钥文件位置，密钥内容不会输出到日志。镜像包含共享浏览器界面，支持 Linux amd64／arm64。
+
+非交互安装可以直接传入参数：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
+  | env PUBLIC_URL=https://relay.example.com INSTALL_DIR=/opt/pudding-relay PORT=8080 sh
+```
+
+默认安装到当前目录下的 `pudding-relay/`，会生成 `.env`、`compose.yaml`、`makefile` 和 `secrets/admin-secret`。目录需对当前用户可写；`/opt` 等系统目录需相应权限。登记数据使用 Compose 命名卷 `relay_data`，不会放进镜像。重复运行保留密钥、配置和登记数据；显式传入的参数更新对应配置。`.env` 按数据读取，不作为 shell 脚本执行。
+
+| 参数 | 默认值／含义 |
+| --- | --- |
+| `PUBLIC_URL` | 首次询问；外部 HTTPS origin，不含路径、查询或片段 |
+| `INSTALL_DIR` | `$PWD/pudding-relay`；以后重复安装使用同一目录 |
+| `IMAGE` | `teatak/pudding-relay:latest`；可改用固定 tag／digest |
+| `PORT` | 宿主机 HTTP 端口，默认 `8080` |
+| `BIND_ADDRESS` | 默认 `127.0.0.1`；仅本机访问，按需要改为可达的内网 IP |
+| `NETWORK` | 可选，加入已存在的 Docker 网络；留空使用 Compose 自身网络 |
+
+以下快捷命令需要 `make`；也可以在同目录直接使用对应的 `docker compose` 命令。
+
+在安装目录执行：
+
+```sh
+make upgrade   # 拉取新镜像并等待服务就绪，保留数据
+make restart   # 重启
+make stop      # 停止服务，保留数据卷
+make start     # 启动或应用 .env 修改
+make logs      # 查看日志
+make status    # 查看状态
+```
+
+安装器不配置域名、TLS 或系统 Docker 服务。外部代理须支持 WebSocket 和不缓冲的 SSE。停止时不要添加 `--volumes`，除非有意删除登记数据。桌面远程功能尚未正式发布，需使用包含此功能的兼容桌面构建。
+
+Go 中继源码遵循 Apache-2.0；镜像中已编译的 Pudding 浏览器资源遵循其 Pudding Desktop 许可，相关许可和第三方声明一并附带，不公开桌面私有源码。
 
 ## 本地开发
 
@@ -73,7 +120,7 @@ curl --fail http://127.0.0.1:8080/healthz
 PUDDING_RELAY_PUBLIC_URL=https://relay.example.com docker compose down
 ```
 
-Compose 在本地构建镜像，仅映射宿主机 loopback，将管理员密钥挂载为文件，在 `relay_data` 卷持久化摘要。镜像使用非 root 用户、只读文件系统并移除 capabilities，不发布公共镜像。设置 `PUDDING_RELAY_PORT=18080` 可更改宿主机端口。除非有意删除全部登记，不使用 `down --volumes`。
+此源码 Compose 构建 `server` 开发 target，仅映射宿主机 loopback，将管理员密钥挂载为文件，在 `relay_data` 卷持久化摘要。镜像使用非 root 用户、只读文件系统并移除 capabilities。用户安装采用上方含浏览器资源的 Docker Hub 发行镜像。设置 `PUDDING_RELAY_PORT=18080` 可更改宿主机端口。除非有意删除全部登记，不使用 `down --volumes`。
 
 在同一宿主机配置反向代理，例如 Caddy：
 
@@ -85,7 +132,7 @@ relay.example.com {
 
 代理须支持 WebSocket upgrade 和不缓冲的 SSE，允许适合部署的附件大小，且不记录凭据、cookie、正文内容。不要将 relay 内部 HTTP 监听直接暴露到公网。真实手机需要受信任的 HTTPS。密钥文件不得提交到版本库；轮换时替换文件并重启 relay。桌面凭据通过 admin 独立撤销。
 
-本功能尚未发布，请使用兼容的桌面构建。桌面包内含匹配版本的手机资源：macOS 路径为 `Pudding.app/Contents/Resources/app/web/dist/remote`，Windows 为 `<安装目录>/resources/app/web/dist/remote`。将目录内容复制到 `mobile-dist`，即可在无需私有源码的情况下部署；维护者也可从匹配的桌面源码构建 `web/dist/remote`。此处不承诺已有公开资源包或镜像。
+本功能尚未发布，请使用兼容的桌面构建。桌面包内含匹配版本的手机资源：macOS 路径为 `Pudding.app/Contents/Resources/app/web/dist/remote`，Windows 为 `<安装目录>/resources/app/web/dist/remote`。将目录内容复制到 `mobile-dist`，即可在无需私有源码的情况下部署；维护者也可从匹配的桌面源码构建 `web/dist/remote`。发行 target 会包含这些资源；本节仅供源码开发和自行构建。
 
 安装手机资源时，只读挂载共享构建，并将 `PUDDING_RELAY_ASSETS_DIR` 设为容器路径，例如覆盖配置：
 
@@ -133,12 +180,27 @@ Admin API 要求 `Authorization: Bearer <管理员密钥>`；若传入 `Origin`�
 
 每块解码数据最大 32,768 字节，JSON 帧最大 65,536 字节。发送方逐块等待 ACK 后才发送下一块或流结束。桌面消费请求块后 ACK；relay 写入并 flush HTTP 响应后 ACK。每桌面最多 64 个活动流，每方向最多一块未确认数据，不维护会话缓冲或重放存储。取消、撤销、断线和退出唤醒等待中的流。响应状态和 headers 在数据前仅发送一次。隧道承载 REST/SSE，不改变业务协议。
 
+## 构建发行镜像
+
+维护者提供已编译的共享浏览器目录和对应许可目录，二者不提交到本仓：
+
+```sh
+WEB_ASSETS_DIR=/path/to/pudding/web/dist/remote \
+WEB_LEGAL_DIR=/path/to/pudding/dist/legal \
+make docker-build
+```
+
+`make docker-publish` 使用同样的输入发布 Linux amd64／arm64 镜像；默认镜像为 `teatak/pudding-relay:latest`，可通过 `IMAGE`、`VERSION` 覆盖。需要当前 Docker 用户有目标仓库的推送权限。`scripts/build-image.sh` 校验 Pudding 的 base 标记和许可，将编译资源通过独立构建 context 放入镜像，不复制私有源码或 source map。
+
+源码 Go 服务镜像可用 `docker build --target server .` 独立构建；完整发行 target 需要 `browser` context。CI 的资源 fixture 只用于安装及持久化验收，不作为发行资源发布。
+
 ## 验证
 
 ```sh
 make fmt
 make check
 make build
+make test-install
 git diff --check
 ```
 

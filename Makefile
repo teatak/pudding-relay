@@ -21,3 +21,17 @@ check:
 
 fmt:
 	gofmt -w cmd internal
+
+.PHONY: test-install docker-build docker-publish smoke-install
+
+test-install:
+	node --test scripts/install.test.cjs
+
+docker-build:
+	./scripts/build-image.sh --load
+
+docker-publish:
+	./scripts/build-image.sh --platform linux/amd64,linux/arm64 --push
+
+smoke-install:
+	node scripts/install-smoke.cjs

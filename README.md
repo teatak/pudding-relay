@@ -4,11 +4,11 @@ English · [简体中文](README.zh-CN.md)
 
 A standalone, self-hosted Go relay for accessing Pudding Desktop from a phone browser outside the local network. Apache-2.0 licensed; no Cloudflare runtime dependency.
 
-The server implements authenticated reverse tunnels, bounded REST/SSE forwarding, persistent desktop credential digests, and a lightweight English/Chinese admin interface. A compatible Pudding Desktop gateway and the shared mobile Web build are required for phone access. Mobile assets are installed separately; building the Go server does not require the private desktop repository.
+The server implements authenticated reverse tunnels, bounded REST/SSE forwarding, persistent desktop credential digests, and a lightweight English/Chinese admin interface. A compatible Pudding Desktop gateway and the shared mobile Web build are required for phone access. The distribution image bundles matching browser assets, so users do not copy them manually. The Go server and its development image still build independently of the private desktop repository.
 
 ## Setup flow
 
-1. Deploy the relay with Docker, its private admin-secret file, a public HTTPS domain and matching browser assets. The commands and reverse-proxy example below cover deployment.
+1. Use the one-command installer below and prepare a reachable external HTTPS origin. It generates the admin secret and starts an image containing the browser UI.
 2. In Pudding **Settings → Remote access**, copy the desktop ID. Open your relay's `/admin`, register this ID, and copy the desktop credential that is shown once.
 3. In Pudding Relay settings, enter the relay HTTPS origin and credential. Save and wait for **Connected**.
 4. On the desktop, select **Generate authorization QR**. Scan it on the phone and tap **Connect**. No device-name entry or further desktop approval is needed. The code expires in five minutes and works once.
@@ -29,6 +29,53 @@ LAN Direct belongs to Pudding Desktop. Both entries reuse mobile Web, desktop au
 Business requests remain REST; session events remain SSE with `Last-Event-ID` resume. Conversations, tasks, approvals and files remain on the desktop. The relay persists only desktop IDs, labels, creation timestamps and SHA-256 credential digests; it does not persist conversation data or log tokens, cookies, request bodies or message contents. HTTPS/WSS protects each connection, not end-to-end encryption across the relay: users must trust its operator. Run exactly one relay instance with exclusive ownership of its registry file.
 
 The mobile first release covers conversations, streaming, attachments, cancellation, user questions and Pudding approvals. Full remote desktop control, native system authorization, voice and offline execution are outside this release. Pudding must stay running; the selected entry must be reachable. LAN works independently of relay availability; models and tools may still require internet access.
+
+## One-command installation
+
+The installer and container checks are implemented. The bundled public image is awaiting publication approval; the command below becomes usable once `teatak/pudding-relay:latest` is published.
+
+Install Docker Engine and Docker Compose v2, then run on the server:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh | sh
+```
+
+The first run asks for the public HTTPS origin, such as `https://relay.example.com`. Relay itself serves HTTP behind your existing HTTPS proxy. Successful installation prints the admin URL and secret-file location, never the secret value. The image includes the shared browser UI and supports Linux amd64/arm64.
+
+For a noninteractive install, pass the settings directly:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
+  | env PUBLIC_URL=https://relay.example.com INSTALL_DIR=/opt/pudding-relay PORT=8080 sh
+```
+
+The default directory is `pudding-relay/` under the current directory. Installation creates `.env`, `compose.yaml`, `makefile` and `secrets/admin-secret`. The directory must be writable; system paths such as `/opt` require suitable permissions. Registrations live in the Compose named volume `relay_data`, outside the image. Reinstallation retains the secret, settings and registrations. Explicit environment arguments update their corresponding settings. `.env` is read as data, never executed as shell code.
+
+| Parameter | Default / meaning |
+| --- | --- |
+| `PUBLIC_URL` | Prompted initially; external HTTPS origin without path, query or fragment |
+| `INSTALL_DIR` | `$PWD/pudding-relay`; reuse the same directory for reinstallation |
+| `IMAGE` | `teatak/pudding-relay:latest`; a fixed tag/digest may be supplied |
+| `PORT` | Host HTTP port, default `8080` |
+| `BIND_ADDRESS` | `127.0.0.1` by default; select a reachable private host IP if needed |
+| `NETWORK` | Optional existing Docker network; empty uses Compose's own network |
+
+The following shortcuts require `make`; the corresponding `docker compose` commands also work directly in this directory.
+
+Run from the installation directory:
+
+```sh
+make upgrade   # Pull/update, wait for readiness, retain data
+make restart   # Restart
+make stop      # Stop, retaining the data volume
+make start     # Start or apply .env changes
+make logs      # Follow logs
+make status    # Show status
+```
+
+The installer does not configure DNS, TLS or the system Docker service. The external proxy must support WebSocket and unbuffered SSE. Do not add `--volumes` when stopping unless intentionally deleting registrations. Desktop remote access is not formally released; use a compatible desktop build containing this feature.
+
+The Go relay source is Apache-2.0 licensed. Compiled Pudding browser assets in the image follow the Pudding Desktop license; that license and third-party notices are included, without publishing private desktop source.
 
 ## Local development
 
@@ -73,7 +120,7 @@ curl --fail http://127.0.0.1:8080/healthz
 PUDDING_RELAY_PUBLIC_URL=https://relay.example.com docker compose down
 ```
 
-Compose builds locally, publishes only host loopback, mounts the admin secret as a file and persists digests in `relay_data`. The image runs non-root with a read-only filesystem and dropped capabilities. No registry image is published. Set `PUDDING_RELAY_PORT=18080` to change the loopback host port. Do not use `down --volumes` unless intentionally deleting all registrations.
+This source Compose builds the `server` development target, publishes only host loopback, mounts the admin secret as a file and persists digests in `relay_data`. The image runs non-root with a read-only filesystem and dropped capabilities. User installs use the Docker Hub distribution above, which includes browser assets. Set `PUDDING_RELAY_PORT=18080` to change the loopback host port. Do not use `down --volumes` unless intentionally deleting all registrations.
 
 Place a reverse proxy on the same host, for example Caddy:
 
@@ -85,7 +132,7 @@ relay.example.com {
 
 The proxy must support WebSocket upgrade and unbuffered SSE, permit attachment sizes appropriate to your deployment, and avoid logging credential/cookie/body contents. Do not expose the relay's internal HTTP listener to the internet. Provision trusted HTTPS for real phones. Keep the admin secret file outside version control. To rotate it, replace the file and restart the relay. Desktop credentials are independently revoked in admin.
 
-This feature has not been released; use a compatible desktop build. Its package includes the matching mobile assets: on macOS, `Pudding.app/Contents/Resources/app/web/dist/remote`; on Windows, `<installation directory>/resources/app/web/dist/remote`. Copy the directory contents into `mobile-dist` to deploy without private source access. Maintainers can also build `web/dist/remote` from the matching desktop source. No released asset bundle or registry image is promised.
+This feature has not been released; use a compatible desktop build. Its package includes the matching mobile assets: on macOS, `Pudding.app/Contents/Resources/app/web/dist/remote`; on Windows, `<installation directory>/resources/app/web/dist/remote`. Copy the directory contents into `mobile-dist` to deploy without private source access. Maintainers can also build `web/dist/remote` from the matching desktop source. The distribution target bundles these assets; this section is for source development and custom builds.
 
 To install mobile assets, mount the shared build read-only and set `PUDDING_RELAY_ASSETS_DIR` to that container path, for example an override:
 
@@ -133,12 +180,27 @@ Every subsequent frame has string `id`. The forwarded `path` preserves URL encod
 
 Each decoded data chunk is at most 32,768 bytes; JSON frames are at most 65,536 bytes. Senders await one ACK after each chunk before sending the next chunk or stream end. Desktop ACKs after consuming request data; relay ACKs after writing/flushing HTTP response data. There are at most 64 active streams per desktop, one unacknowledged chunk per direction, and no conversation buffer or replay store. Cancellation, revocation, disconnect and shutdown wake waiting streams. Response status/headers arrive once before data. The tunnel carries REST/SSE; it does not change their business protocol.
 
+## Building a distribution image
+
+Maintainers supply the compiled shared browser directory and its matching notices, neither committed to this repository:
+
+```sh
+WEB_ASSETS_DIR=/path/to/pudding/web/dist/remote \
+WEB_LEGAL_DIR=/path/to/pudding/dist/legal \
+make docker-build
+```
+
+`make docker-publish` uses the same inputs to push Linux amd64/arm64 images. The default reference is `teatak/pudding-relay:latest`; `IMAGE` and `VERSION` override it. The current Docker user needs push access. `scripts/build-image.sh` checks Pudding's base marker and license files, then supplies binary assets through a named context, excluding private source and source maps.
+
+The standalone Go image builds with `docker build --target server .`; the complete distribution needs the `browser` context. CI UI fixtures only test installation and persistence; they are never published as release assets.
+
 ## Verification
 
 ```sh
 make fmt
 make check
 make build
+make test-install
 git diff --check
 ```
 
