@@ -94,7 +94,7 @@ PUDDING_RELAY_ADMIN_SECRET_FILE="$PWD/secrets/admin-secret" \
 make run
 ```
 
-默认监听 `127.0.0.1:9623`，可直接在可信本机环境使用 HTTP 管理页。公网 HTTPS/WSS 由反向代理处理，Relay 不保存固定外部域名。每个管理 API 都要求管理员 Bearer 密钥。管理接口不使用 Cookie 鉴权、不开放 CORS，也不从 Host、Origin 或转发头推断管理员身份。普通反向代理配置即可支持非标准外部 HTTPS 端口，无需可信代理网段或自定义管理路径。
+默认监听 `127.0.0.1:9623`，可直接在可信本机环境使用 HTTP 管理页。公网 HTTPS/WSS 由反向代理处理，Relay 不保存固定外部域名。每个管理 API 都要求显式的 Bearer 凭据（管理员密钥或短期登录令牌）。管理接口不使用 Cookie 鉴权、不开放 CORS，也不从 Host、Origin 或转发头推断管理员身份。普通反向代理配置即可支持非标准外部 HTTPS 端口，无需可信代理网段或自定义管理路径。
 
 | 参数 | 含义 |
 | --- | --- |
@@ -131,14 +131,20 @@ docker compose down
 
 ## Admin 与接口
 
-打开 `/admin`，选择 English 或简体中文，输入管理员密钥。页面仅在内存中保留密钥，退出或关闭页面后清除。标准登录表单支持浏览器密码管理器；是否保存由你选择，并取决于浏览器设置。密码管理器账号标记固定为 `admin@pudding-relay`，与其他服务的通用 `admin` 区分；网站地址由浏览器单独管理。浏览器仍可能建议关联网站的凭据，保存或更新时请确认对应网站和账号。从 Pudding 远程访问设置复制已有桌面 ID，登记后将仅显示一次的凭据填写到桌面中继设置。不要另造中继桌面 ID。撤销会删除摘要、断开隧道并拒绝后续握手；撤销后重新登记相同 ID 会生成新凭据。
+打开 `/admin`，选择 English 或简体中文，输入管理员密钥。登录时，页面用密钥换取随机登录令牌，随后清空密钥输入框，仅将令牌暂存在当前标签页的 `sessionStorage` 中。刷新标签页会自动恢复登录。令牌在登录 24 小时后过期；主动退出立即撤销该令牌，重启 Relay 会使所有管理登录失效。其他标签页独立创建的登录和桌面隧道不受影响。浏览器恢复标签页时可能恢复标签页存储，但不会延长服务端强制的有效期。应用不会将管理员密钥存入浏览器存储。
 
-每次 Admin API 操作都要求 `Authorization: Bearer <管理员密钥>`；Cookie 不能用于管理员鉴权，不开放跨域预检。Host、Origin 或代理协议改写不会拒绝已正确认证的管理请求。更换代理域名无需重启或修改 Relay；Pudding 桌面端仍需更新连接地址，浏览器在新域名重新配对。响应均为 `Cache-Control: no-store`。
+标准登录表单支持浏览器密码管理器；是否保存由你选择，并取决于浏览器设置。密码管理器账号标记固定为 `admin@pudding-relay`，与其他服务的通用 `admin` 区分；网站地址由浏览器单独管理。浏览器仍可能建议关联网站的凭据，保存或更新时请确认对应网站和账号。
+
+从 Pudding 远程访问设置复制已有桌面 ID，登记后将仅显示一次的凭据填写到桌面中继设置。不要另造中继桌面 ID。撤销会删除摘要、断开隧道并拒绝后续握手；撤销后重新登记相同 ID 会生成新凭据。
+
+每次桌面管理 API 操作都要求 `Authorization: Bearer <管理员密钥或登录令牌>`。自动化调用可直接使用管理员密钥。只有管理员密钥可以创建登录令牌；登录令牌不能自行续期或创建其他令牌。Relay 仅在内存中保存登录令牌摘要和到期时间，最多允许 128 个有效登录，创建新登录时会清理过期记录。Cookie 不能用于管理员鉴权，不开放跨域预检。Host、Origin 或代理协议改写不会拒绝已正确认证的管理请求。更换代理域名无需重启或修改 Relay；Pudding 桌面端仍需更新连接地址，浏览器在新域名重新配对。响应均为 `Cache-Control: no-store`。
 
 | 接口 | 契约 |
 | --- | --- |
 | `GET /healthz` | `{"status":"ok"}`，仅表示进程健康，不代表隧道就绪；支持 HEAD |
 | `GET /version` | 构建 `version`、`commit`；支持 HEAD |
+| `POST /admin/api/session` | 管理员密钥 Bearer → `{"token":"…","expiresAt":"RFC3339"}`；登录有效期 24 小时；达到 128 个有效登录时返回 429 |
+| `DELETE /admin/api/session` | 登录令牌 Bearer → 204，撤销该登录；已过期或已撤销的令牌也返回 204 |
 | `GET /admin/api/desktops` | `{"desktops":[{"desktopID":"…","label":"…","createdAt":"RFC3339","online":true}]}`，无凭据或摘要 |
 | `POST /admin/api/desktops` | JSON `{"desktopID":"existing-core-id","label":"My desktop"}` → 201，含 `desktopID`、`label`、`createdAt`、一次性 `token`；重复 ID → 409 |
 | `DELETE /admin/api/desktops/{desktopID}` | 204，持久化撤销并关闭活动隧道 |

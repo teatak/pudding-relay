@@ -94,7 +94,7 @@ PUDDING_RELAY_ADMIN_SECRET_FILE="$PWD/secrets/admin-secret" \
 make run
 ```
 
-The default listener is `127.0.0.1:9623`; HTTP admin works directly in a trusted local environment. A reverse proxy terminates public HTTPS/WSS, and Relay stores no fixed external domain. Every admin API requires the bearer secret. Admin does not use cookie authentication or enable CORS; it does not infer authentication from Host, Origin or forwarding headers. Ordinary reverse-proxy configuration works with nonstandard external HTTPS ports, without a trusted-proxy setting or a custom admin location.
+The default listener is `127.0.0.1:9623`; HTTP admin works directly in a trusted local environment. A reverse proxy terminates public HTTPS/WSS, and Relay stores no fixed external domain. Every admin API requires an explicit bearer credential (the administrator secret or a short-lived login token). Admin does not use cookie authentication or enable CORS; it does not infer authentication from Host, Origin or forwarding headers. Ordinary reverse-proxy configuration works with nonstandard external HTTPS ports, without a trusted-proxy setting or a custom admin location.
 
 | Option | Meaning |
 | --- | --- |
@@ -131,14 +131,20 @@ Browser UI deployment belongs to Pudding Desktop. The desktop gateway returns `/
 
 ## Admin and endpoints
 
-Open `/admin`, choose English or 简体中文, and enter the admin secret. The page keeps the secret in memory and clears it when you sign out or close the tab. The standard login form supports browser password managers; saving is your choice and depends on browser settings. The password-manager account label is `admin@pudding-relay`, distinct from the generic `admin` used by other services; site addresses are managed separately by the browser. Browsers may still suggest credentials from related sites; verify the site/account before saving or updating a record. Copy the desktop's existing ID from Pudding Remote access settings, register it, and copy the one-time credential into the desktop's relay settings. Do not invent a separate relay desktop ID. Revocation removes the stored digest, disconnects the tunnel and rejects future handshakes. Re-registering the same ID after revocation issues a new credential.
+Open `/admin`, choose English or 简体中文, and enter the admin secret. At login, the page exchanges the secret for a random login token, clears the secret field, and keeps only that token in tab-scoped `sessionStorage`. Refreshing the tab restores login automatically. Tokens expire 24 hours after login; signing out revokes the token immediately, and restarting Relay invalidates all admin logins. Other tabs with independently created logins and desktop tunnels are unaffected. Browser tab restoration may restore tab storage, but never extends the server-enforced expiry. The application does not store the administrator secret in browser storage.
 
-Admin APIs require `Authorization: Bearer <admin secret>` on every operation. Cookies cannot authenticate admin; cross-origin preflight is not enabled. Host/Origin/proxy protocol rewriting does not reject a correctly authenticated admin request. Changing the proxy domain needs no Relay restart or configuration update. Pudding Desktop still needs its connection URL updated, and browsers pair again at the new origin. Responses use `Cache-Control: no-store`.
+The standard login form supports browser password managers; saving is your choice and depends on browser settings. The password-manager account label is `admin@pudding-relay`, distinct from the generic `admin` used by other services; site addresses are managed separately by the browser. Browsers may still suggest credentials from related sites; verify the site/account before saving or updating a record.
+
+Copy the desktop's existing ID from Pudding Remote access settings, register it, and copy the one-time credential into the desktop's relay settings. Do not invent a separate relay desktop ID. Revocation removes the stored digest, disconnects the tunnel and rejects future handshakes. Re-registering the same ID after revocation issues a new credential.
+
+Desktop management APIs require `Authorization: Bearer <admin secret or login token>` on every operation. API automation can continue using the administrator secret directly. Only that secret can create a login token; login tokens cannot renew themselves or create other login tokens. Relay keeps login-token digests and expiration times only in memory, with at most 128 active logins. Expired entries are removed when another login is created. Cookies cannot authenticate admin; cross-origin preflight is not enabled. Host/Origin/proxy protocol rewriting does not reject a correctly authenticated admin request. Changing the proxy domain needs no Relay restart or configuration update. Pudding Desktop still needs its connection URL updated, and browsers pair again at the new origin. Responses use `Cache-Control: no-store`.
 
 | Endpoint | Contract |
 | --- | --- |
 | `GET /healthz` | `{"status":"ok"}`, process health, not tunnel readiness; also HEAD |
 | `GET /version` | Build `version` and `commit`; also HEAD |
+| `POST /admin/api/session` | Administrator-secret bearer → `{"token":"…","expiresAt":"RFC3339"}`; 24-hour login; 429 when 128 active logins are reached |
+| `DELETE /admin/api/session` | Login-token bearer → 204, revokes that login; already expired/revoked tokens also return 204 |
 | `GET /admin/api/desktops` | `{"desktops":[{"desktopID":"…","label":"…","createdAt":"RFC3339","online":true}]}`; no credential/digest |
 | `POST /admin/api/desktops` | JSON `{"desktopID":"existing-core-id","label":"My desktop"}` → 201 with `desktopID`, `label`, `createdAt`, one-time `token`; duplicate ID → 409 |
 | `DELETE /admin/api/desktops/{desktopID}` | 204, persistent revocation and active tunnel close |

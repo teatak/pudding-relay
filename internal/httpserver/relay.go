@@ -3,7 +3,6 @@ package httpserver
 import (
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -33,10 +32,11 @@ type Config struct {
 	Store       *Store
 }
 type Relay struct {
-	cfg     Config
-	mu      sync.Mutex
-	tunnels map[string]*tunnel
-	closed  bool
+	cfg           Config
+	mu            sync.Mutex
+	tunnels       map[string]*tunnel
+	closed        bool
+	adminSessions map[[32]byte]time.Time
 }
 type frame struct {
 	Type      string            `json:"type"`
@@ -77,13 +77,15 @@ func NewRelay(build BuildInfo, cfg Config) (*Relay, http.Handler, error) {
 	if len(cfg.AdminSecret) < 32 || cfg.Store == nil {
 		return nil, nil, errors.New("admin secret (32+ bytes) and registration store required")
 	}
-	relay := &Relay{cfg: cfg, tunnels: map[string]*tunnel{}}
+	relay := &Relay{cfg: cfg, tunnels: map[string]*tunnel{}, adminSessions: map[[32]byte]time.Time{}}
 	mux := http.NewServeMux()
 	mux.Handle("GET /healthz", NewHandler(build))
 	mux.Handle("GET /version", NewHandler(build))
 	mux.HandleFunc("GET /tunnel", relay.acceptTunnel)
 	mux.HandleFunc("/d/{desktopID}/", relay.forward)
 	mux.HandleFunc("GET /admin", relay.adminPage)
+	mux.HandleFunc("POST /admin/api/session", relay.adminLogin)
+	mux.HandleFunc("DELETE /admin/api/session", relay.adminLogout)
 	mux.HandleFunc("GET /admin/api/desktops", relay.adminList)
 	mux.HandleFunc("POST /admin/api/desktops", relay.adminAdd)
 	mux.HandleFunc("DELETE /admin/api/desktops/{desktopID}", relay.adminDelete)
@@ -107,6 +109,7 @@ func NewRelay(build BuildInfo, cfg Config) (*Relay, http.Handler, error) {
 func (r *Relay) Close() {
 	r.mu.Lock()
 	r.closed = true
+	clear(r.adminSessions)
 	ts := make([]*tunnel, 0, len(r.tunnels))
 	for _, t := range r.tunnels {
 		ts = append(ts, t)
@@ -460,16 +463,6 @@ func cleanHeadersFromMap(m map[string]string) map[string]string {
 		h.Set(k, v)
 	}
 	return cleanHeaders(h)
-}
-func (r *Relay) authorized(w http.ResponseWriter, req *http.Request) bool {
-	header := req.Header.Get("Authorization")
-	a := strings.TrimPrefix(header, "Bearer ")
-	if !strings.HasPrefix(header, "Bearer ") || subtle.ConstantTimeCompare([]byte(a), []byte(r.cfg.AdminSecret)) != 1 {
-		w.Header().Set("WWW-Authenticate", "Bearer")
-		errorJSON(w, 401, "admin authentication required")
-		return false
-	}
-	return true
 }
 func (r *Relay) adminList(w http.ResponseWriter, req *http.Request) {
 	if !r.authorized(w, req) {

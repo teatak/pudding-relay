@@ -48,7 +48,7 @@ func TestAdminPageIsPrivateSelfContainedAndBilingual(t *testing.T) {
 	if strings.Contains(page, `name="username" autocomplete="username" value="admin"`) {
 		t.Fatal("generic admin identity can collide with sibling services")
 	}
-	for _, unsafe := range []string{token, strings.Repeat("a", 32), "localStorage", "sessionStorage", "<script src="} {
+	for _, unsafe := range []string{token, strings.Repeat("a", 32), "localStorage", "<script src="} {
 		if strings.Contains(page, unsafe) {
 			t.Fatal("admin page leaks authentication or loads an external script")
 		}
