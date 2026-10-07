@@ -30,6 +30,8 @@ Pudding 支持两个可独立启用、同时使用的入口：
 
 业务请求保留 REST，会话事件保留支持 `Last-Event-ID` 续传的 SSE。会话、任务、审批和文件留在电脑。relay 仅持久化桌面 ID、名称、创建时间及 SHA-256 凭据摘要，不持久化会话数据，不记录 token、cookie、请求正文或消息内容。HTTPS/WSS 保护每段连接，不代表跨中继端到端加密，用户需要信任部署者。仅运行一个 relay 实例，独占登记文件。
 
+Relay 0.1.6 起，浏览器以 canonical 轮次快照同步后台会话结束状态，修复切换会话后运行指示持续转圈的问题。
+
 兼容的浏览器构建支持会话（包括流式结果、附件、取消、用户补答和审批）、Studio 文档与表格、定时任务、已安装应用状态及已授权项目文件。具体操作由桌面网关的授权策略决定；原生设置和系统能力仍在电脑端操作。目前不提供完整远程桌面控制、语音与离线执行。Pudding 须保持运行，入口须可达。直连不依赖中继可用性，模型和工具仍可能需要外网。
 
 ## 一键安装
@@ -209,7 +211,7 @@ make release-major
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env IMAGE=teatak/pudding-relay:0.1.5 sh
+  | env IMAGE=teatak/pudding-relay:0.1.6 sh
 ```
 
 `latest` 跟随新发行版；固定标签保持该版本，`make upgrade` 沿用安装时选择的镜像。
@@ -234,4 +236,4 @@ git diff --check
 
 重新运行安装命令，让安装器移除已废弃的 `PUBLIC_URL` 和旧 Compose 环境项，并保留密钥与登记数据；只拉取镜像不会更新旧安装模板。从 0.1.3 起，安装器同时移除已废弃的 `TRUSTED_PROXIES`。镜像升级后，可删除此前为非标准 HTTPS 端口添加的自定义管理路径反代配置。`--public-url`、`--allow-insecure-loopback` 和 `--trusted-proxies` 已删除，不保留旧参数路径。
 
-默认服务端口从 `0.1.2` 起统一为 `9623`（Go、容器、健康检查和全新安装）。已有安装的宿主机 `PORT` 会保留；重新运行安装器将 Compose 容器 target 更新为 `9623`。若已有安装使用旧版固定镜像标签，重新运行时显式传入 `IMAGE=teatak/pudding-relay:0.1.5`。
+默认服务端口从 `0.1.2` 起统一为 `9623`（Go、容器、健康检查和全新安装）。已有安装的宿主机 `PORT` 会保留；重新运行安装器将 Compose 容器 target 更新为 `9623`。若已有安装使用旧版固定镜像标签，重新运行时显式传入 `IMAGE=teatak/pudding-relay:0.1.6`。

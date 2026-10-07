@@ -30,6 +30,8 @@ LAN Direct belongs to Pudding Desktop. Both entries reuse the browser UI, deskto
 
 Business requests remain REST; session events remain SSE with `Last-Event-ID` resume. Conversations, tasks, approvals and files remain on the desktop. The relay persists only desktop IDs, labels, creation timestamps and SHA-256 credential digests; it does not persist conversation data or log tokens, cookies, request bodies or message contents. HTTPS/WSS protects each connection, not end-to-end encryption across the relay: users must trust its operator. Run exactly one relay instance with exclusive ownership of its registry file.
 
+Starting with Relay 0.1.6, background conversation completion is reconciled from canonical turn snapshots, so switching to another conversation no longer leaves its running indicator stuck.
+
 Compatible browser builds provide conversations (including streaming, attachments, cancellation, user questions and approvals), Studio documents and tables, scheduled tasks, installed-app status, and authorized project files. Available operations follow the desktop gateway's authorization policy; native settings and system capabilities remain on the desktop. Full remote desktop control, voice and offline execution are not provided. Pudding must stay running; the selected entry must be reachable. LAN works independently of relay availability; models and tools may still require internet access.
 
 ## One-command installation
@@ -209,7 +211,7 @@ Install a fixed version:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env IMAGE=teatak/pudding-relay:0.1.5 sh
+  | env IMAGE=teatak/pudding-relay:0.1.6 sh
 ```
 
 `latest` follows new releases. A fixed tag remains on that version; `make upgrade` keeps the image reference selected at installation.
@@ -234,4 +236,4 @@ git diff --check
 
 Rerun the installer to remove obsolete `PUBLIC_URL` and Compose environment settings while retaining secrets and registration data; pulling an image alone does not update the old template. Starting with 0.1.3, the installer also removes obsolete `TRUSTED_PROXIES`. After updating the image, remove the custom admin proxy location previously required for nonstandard HTTPS ports. The removed `--public-url`, `--allow-insecure-loopback` and `--trusted-proxies` flags have no compatibility path.
 
-Starting with `0.1.2`, the default service port is `9623` across Go, containers, health checks and fresh installations. Existing host `PORT` selections are retained; rerun the installer to update the Compose container target to `9623`. If an installation pins an older image tag, explicitly pass `IMAGE=teatak/pudding-relay:0.1.5` when rerunning.
+Starting with `0.1.2`, the default service port is `9623` across Go, containers, health checks and fresh installations. Existing host `PORT` selections are retained; rerun the installer to update the Compose container target to `9623`. If an installation pins an older image tag, explicitly pass `IMAGE=teatak/pudding-relay:0.1.6` when rerunning.
