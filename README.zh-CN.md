@@ -179,6 +179,8 @@ make docker-build
 
 ## 版本与发版
 
+0.1.7 使用最长有效 24 小时的短期登录令牌，让 Relay 管理页在同一标签页刷新后保持登录。主动退出会撤销令牌；过期或 Relay 重启后需要重新登录。同时修复电脑列表加载后撤销按钮一直禁用的问题。运行 `make upgrade` 更新镜像即可，无需调整反向代理配置。
+
 `make build`、`make run` 和 Docker 构建均读取根目录 `VERSION`，`--version` 与 `/version` 显示相同正式版本。
 
 ```sh
@@ -198,7 +200,7 @@ make release-major
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env IMAGE=teatak/pudding-relay:0.1.6 sh
+  | env IMAGE=teatak/pudding-relay:0.1.7 sh
 ```
 
 `latest` 跟随新发行版；固定标签保持该版本，`make upgrade` 沿用安装时选择的镜像。
@@ -225,4 +227,4 @@ git diff --check
 
 重新运行安装命令，让安装器移除已废弃的 `PUBLIC_URL` 和旧 Compose 环境项，并保留密钥与登记数据；只拉取镜像不会更新旧安装模板。从 0.1.3 起，安装器同时移除已废弃的 `TRUSTED_PROXIES`。镜像升级后，可删除此前为非标准 HTTPS 端口添加的自定义管理路径反代配置。`--public-url`、`--allow-insecure-loopback` 和 `--trusted-proxies` 已删除，不保留旧参数路径。
 
-默认服务端口从 `0.1.2` 起统一为 `9623`（Go、容器、健康检查和全新安装）。已有安装的宿主机 `PORT` 会保留；重新运行安装器将 Compose 容器 target 更新为 `9623`。若已有安装使用旧版固定镜像标签，重新运行时显式传入 `IMAGE=teatak/pudding-relay:0.1.6`。
+默认服务端口从 `0.1.2` 起统一为 `9623`（Go、容器、健康检查和全新安装）。已有安装的宿主机 `PORT` 会保留；重新运行安装器将 Compose 容器 target 更新为 `9623`。若已有安装使用旧版固定镜像标签，重新运行时显式传入 `IMAGE=teatak/pudding-relay:0.1.7`。

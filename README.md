@@ -179,6 +179,8 @@ make docker-build
 
 ## Versioning and releases
 
+Version 0.1.7 keeps Relay admin signed in across refreshes in the same tab, using a temporary login token valid for up to 24 hours. Signing out revokes the token; expiry or a Relay restart requires another login. It also fixes desktop revoke buttons remaining disabled after the list loads. Upgrade the image using `make upgrade`; no proxy configuration change is needed.
+
 `make build`, `make run` and Docker builds read the root `VERSION` file. Both `--version` and `/version` report that release version.
 
 ```sh
@@ -198,7 +200,7 @@ Install a fixed version:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env IMAGE=teatak/pudding-relay:0.1.6 sh
+  | env IMAGE=teatak/pudding-relay:0.1.7 sh
 ```
 
 `latest` follows new releases. A fixed tag remains on that version; `make upgrade` keeps the image reference selected at installation.
@@ -225,4 +227,4 @@ Starting with 0.1.6, Relay forwards Pudding pages and assets through the desktop
 
 Rerun the installer to remove obsolete `PUBLIC_URL` and Compose environment settings while retaining secrets and registration data; pulling an image alone does not update the old template. Starting with 0.1.3, the installer also removes obsolete `TRUSTED_PROXIES`. After updating the image, remove the custom admin proxy location previously required for nonstandard HTTPS ports. The removed `--public-url`, `--allow-insecure-loopback` and `--trusted-proxies` flags have no compatibility path.
 
-Starting with `0.1.2`, the default service port is `9623` across Go, containers, health checks and fresh installations. Existing host `PORT` selections are retained; rerun the installer to update the Compose container target to `9623`. If an installation pins an older image tag, explicitly pass `IMAGE=teatak/pudding-relay:0.1.6` when rerunning.
+Starting with `0.1.2`, the default service port is `9623` across Go, containers, health checks and fresh installations. Existing host `PORT` selections are retained; rerun the installer to update the Compose container target to `9623`. If an installation pins an older image tag, explicitly pass `IMAGE=teatak/pudding-relay:0.1.7` when rerunning.
