@@ -35,13 +35,13 @@ func TestAdminPageIsPrivateSelfContainedAndBilingual(t *testing.T) {
 			t.Fatalf("missing control %s", control)
 		}
 	}
-	// Before JavaScript resolves authentication, neither view may be painted.
-	for _, marker := range []string{`<div id="loginView" class="login-layout" hidden>`, `<div id="manage" class="workspace" hidden>`} {
+	// Before authentication resolves, only the full-screen spinner may be painted.
+	for _, marker := range []string{`<div id="adminShell" class="shell" hidden>`, `<div id="loginView" class="login-layout" hidden>`, `<div id="manage" class="workspace" hidden>`} {
 		if !strings.Contains(page, marker) {
 			t.Fatal("admin page shows a view before login restoration")
 		}
 	}
-	for _, text := range []string{"Registered desktops", "已登记的电脑", "Copy and save it now", "请立即复制保存", "Restoring login…", "正在恢复登录…"} {
+	for _, text := range []string{"Registered desktops", "已登记的电脑", "Copy and save it now", "请立即复制保存", "Loading…", "正在加载…"} {
 		if !strings.Contains(page, text) {
 			t.Fatalf("missing translation %s", text)
 		}
