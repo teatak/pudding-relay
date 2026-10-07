@@ -2,18 +2,20 @@
 
 English · [简体中文](README.zh-CN.md)
 
-A standalone, self-hosted Go relay for accessing Pudding Desktop from a phone browser outside the local network. Apache-2.0 licensed; no Cloudflare runtime dependency.
+A standalone, self-hosted Go relay for accessing Pudding Desktop from a phone or another computer through a browser outside the local network. Apache-2.0 licensed; no Cloudflare runtime dependency.
 
-The server implements authenticated reverse tunnels, bounded REST/SSE forwarding, persistent desktop credential digests, and a lightweight English/Chinese admin interface. A compatible Pudding Desktop gateway and the shared mobile Web build are required for phone access. The distribution image bundles matching browser assets, so users do not copy them manually. The Go server and its development image still build independently of the private desktop repository.
+The server implements authenticated reverse tunnels, bounded REST/SSE forwarding, persistent desktop credential digests, and a lightweight English/Chinese admin interface. Browser access requires a compatible Pudding Desktop gateway and shared browser build. The distribution image bundles matching browser assets, so users do not copy them manually. The Go server and its development image still build independently of the private desktop repository.
 
 ## Setup flow
 
 1. Install the HTTP backend using the command below, without a domain or certificate. It generates the admin secret and starts an image containing the browser UI. Your existing reverse proxy handles public HTTPS.
 2. In Pudding **Settings → Remote access**, copy the desktop ID. Open your relay's `/admin`, register this ID, and copy the desktop credential that is shown once.
 3. In Pudding Relay settings, enter the relay HTTPS origin and credential. Save and wait for **Connected**.
-4. On the desktop, select **Generate authorization QR**. Scan it on the phone and tap **Connect**. No device-name entry or further desktop approval is needed. The code expires in five minutes and works once.
+4. On the desktop, select **Generate authorization QR**. Scan it on the phone, or copy the authorization link into another computer's browser, then select **Connect**. No device-name entry or further desktop approval is needed. The code expires in five minutes and works once.
 
 The desktop displays paired devices and pairing time. **Cancel pairing** immediately revokes browser access; it does not cancel an accepted task. Revoking a desktop credential in relay admin instead disconnects that desktop's entire tunnel.
+
+One relay supports multiple Pudding desktops, each with its own ID, credential and tunnel. Multiple browsers can pair with each desktop. The desktop ID is stored in the desktop's local database and survives restarts, upgrades and IP address changes. A fresh data directory or deleting that database generates a new ID. Copying the database to another computer also copies the ID; the same ID cannot have two active tunnels.
 
 ## Connection modes and boundaries
 
@@ -21,14 +23,14 @@ Pudding supports two independently enabled entries; both may be active:
 
 | Mode | Path |
 | --- | --- |
-| LAN Direct | Phone → desktop HTTP gateway → loopback daemon; bypasses this relay |
-| Relay | Phone → public HTTPS relay → desktop gateway through an outbound WSS tunnel → loopback daemon |
+| LAN Direct | Browser → desktop HTTP gateway → loopback daemon; bypasses this relay |
+| Relay | Browser → public HTTPS relay → desktop gateway through an outbound WSS tunnel → loopback daemon |
 
-LAN Direct belongs to Pudding Desktop. Both entries reuse mobile Web, desktop authorization codes, route authorization and business handlers. The daemon stays on loopback, and its startup token stays on the desktop. Users open an explicit endpoint; the first release does not discover or switch endpoints automatically. LAN and relay have separate browser logins under the same desktop authorization model. LAN uses certificate-free HTTP on a trusted local network; relay continues to require public HTTPS/WSS. A LAN address change requires opening the new address and pairing again.
+LAN Direct belongs to Pudding Desktop. Both entries reuse the browser UI, desktop authorization codes, route authorization and business handlers. The daemon stays on loopback, and its startup token stays on the desktop. Users open an explicit endpoint; endpoints are not discovered or switched automatically. LAN and relay have separate browser logins under the same desktop authorization model. LAN uses HTTP on a trusted local network; relay continues to require public HTTPS/WSS. A LAN address change requires opening the new address and pairing again.
 
 Business requests remain REST; session events remain SSE with `Last-Event-ID` resume. Conversations, tasks, approvals and files remain on the desktop. The relay persists only desktop IDs, labels, creation timestamps and SHA-256 credential digests; it does not persist conversation data or log tokens, cookies, request bodies or message contents. HTTPS/WSS protects each connection, not end-to-end encryption across the relay: users must trust its operator. Run exactly one relay instance with exclusive ownership of its registry file.
 
-The mobile first release covers conversations, streaming, attachments, cancellation, user questions and Pudding approvals. Full remote desktop control, native system authorization, voice and offline execution are outside this release. Pudding must stay running; the selected entry must be reachable. LAN works independently of relay availability; models and tools may still require internet access.
+Compatible browser builds provide conversations (including streaming, attachments, cancellation, user questions and approvals), Studio documents and tables, scheduled tasks, installed-app status, and authorized project files. Available operations follow the desktop gateway's authorization policy; native settings and system capabilities remain on the desktop. Full remote desktop control, voice and offline execution are not provided. Pudding must stay running; the selected entry must be reachable. LAN works independently of relay availability; models and tools may still require internet access.
 
 ## One-command installation
 
@@ -96,7 +98,7 @@ The default listener is `127.0.0.1:9623`; HTTP admin works directly in a trusted
 | --- | --- |
 | `--listen` | HTTP listener, default `127.0.0.1:9623` |
 | `--data-file` | Digest registry, default `data/registrations.json` |
-| `--assets-dir` | Shared mobile build directory; environment: `PUDDING_RELAY_ASSETS_DIR` |
+| `--assets-dir` | Shared browser build directory; environment: `PUDDING_RELAY_ASSETS_DIR` |
 | `PUDDING_RELAY_ADMIN_SECRET_FILE` | Required admin secret file, at least 32 bytes after trimming |
 
 `make build` produces `bin/pudding-relay` and embeds the Git commit; the version comes from `VERSION`, and `COMMIT` can override commit metadata. `--version` prints it without requiring server configuration. SIGINT/SIGTERM closes tunnels, wakes active streams and shuts down HTTP. The registry is atomically replaced; POSIX systems use file mode `0600` and newly created directory mode `0700`. Windows uses the data directory’s ACL permissions. Back it up securely; lost credentials must be revoked and recreated.
@@ -124,9 +126,9 @@ Configure your proxy to reach the Relay HTTP backend. No trusted-proxy CIDRs or 
 
 The proxy must support WebSocket upgrade and unbuffered SSE, permit attachment sizes appropriate to your deployment, and avoid logging credential/cookie/body contents. Do not expose the relay's internal HTTP listener to the internet. Provision trusted HTTPS for real phones. Keep the admin secret file outside version control. To rotate it, replace the file and restart the relay. Desktop credentials are independently revoked in admin.
 
-This feature has not been released; use a compatible desktop build. Its package includes the matching mobile assets: on macOS, `Pudding.app/Contents/Resources/app/web/dist/remote`; on Windows, `<installation directory>/resources/app/web/dist/remote`. Copy the directory contents into `mobile-dist` to deploy without private source access. Maintainers can also build `web/dist/remote` from the matching desktop source. The distribution target bundles these assets; this section is for source development and custom builds.
+For source development and custom images, use the browser assets from a compatible desktop build. Its package includes matching assets: on macOS, `Pudding.app/Contents/Resources/app/web/dist/remote`; on Windows, `<installation directory>/resources/app/web/dist/remote`. Copy the directory contents into `mobile-dist` to deploy without private source access. Maintainers can also build `web/dist/remote` from the matching desktop source. The published distribution image already bundles these assets; normal installations need no separate asset mount.
 
-To install mobile assets, mount the shared build read-only and set `PUDDING_RELAY_ASSETS_DIR` to that container path, for example an override:
+To install browser assets in a custom image, mount the shared build read-only and set `PUDDING_RELAY_ASSETS_DIR` to that container path, for example an override:
 
 ```yaml
 services:
@@ -137,7 +139,7 @@ services:
       - ./mobile-dist:/assets:ro
 ```
 
-The shared HTML uses `<base href="__PUDDING_REMOTE_BASE__" />`; the relay replaces the marker with `/d/{desktopID}/` and permits that same-origin base in CSP. `/pair` and `/s/{sessionID}` deep links return this HTML, so relative assets resolve under the desktop base. They load while the desktop is offline; business requests return a clear `503`. Without `index.html`, the relay shows an explicit installation page, not a substitute mobile client.
+The shared HTML uses `<base href="__PUDDING_REMOTE_BASE__" />`; the relay replaces the marker with `/d/{desktopID}/` and permits that same-origin base in CSP. `/pair` and `/s/{sessionID}` deep links return this HTML, so relative assets resolve under the desktop base. They load while the desktop is offline; business requests return a clear `503`. Without `index.html`, the relay shows an explicit installation page, not a substitute browser client.
 
 ## Admin and endpoints
 
@@ -154,9 +156,9 @@ Admin APIs require `Authorization: Bearer <admin secret>` on every operation. Co
 | `DELETE /admin/api/desktops/{desktopID}` | 204, persistent revocation and active tunnel close |
 | `GET /tunnel` | WebSocket protocol v1, authenticated first frame |
 | `/d/{desktopID}/api/*`, `/d/{desktopID}/remote/*` | HTTP forwarded through the registered desktop gateway; offline → 503 |
-| `GET /d/{desktopID}/…` | Installed mobile assets; unknown desktop → 404 |
+| `GET /d/{desktopID}/…` | Installed browser assets; unknown desktop → 404 |
 
-The desktop gateway owns phone pairing/login and route authorization. The relay cannot bypass it and cannot proxy arbitrary destinations. Cookies, `Origin`, and `Last-Event-ID` are forwarded; authorization, host, hop-by-hop, forwarded and incoming `X-Pudding-*` headers are stripped. The relay only supplies `X-Pudding-Remote-Mode=relay`. Browser Origin is preserved; the desktop gateway validates pairing and business permissions against its configured relay URL.
+The desktop gateway owns browser pairing/login and route authorization. The relay cannot bypass it and cannot proxy arbitrary destinations. Cookies, `Origin`, and `Last-Event-ID` are forwarded; authorization, host, hop-by-hop, forwarded and incoming `X-Pudding-*` headers are stripped. The relay only supplies `X-Pudding-Remote-Mode=relay`. Browser Origin is preserved; the desktop gateway validates pairing and business permissions against its configured relay URL.
 
 ## Tunnel protocol v1
 
@@ -222,7 +224,7 @@ make test-install
 git diff --check
 ```
 
-`make check` verifies formatting, runs vet and tests with the race detector. Tests cover digest persistence/restart, file permissions, concurrent registration, admin authentication, revoke/disconnect, protocol validation and closed admin CORS, bounded frames/streams, upload, SSE, trusted headers, cancellation, shutdown and mobile deep links. CI also builds and smoke-tests the container. Desktop and real-phone integration must be tested with a compatible gateway and installed mobile build.
+`make check` verifies formatting, runs vet and tests with the race detector. Tests cover digest persistence/restart, file permissions, concurrent registration, admin authentication, revoke/disconnect, protocol validation and closed admin CORS, bounded frames/streams, upload, SSE, trusted headers, cancellation, shutdown and browser deep links. CI also builds and smoke-tests the container. Desktop/browser integration requires a compatible gateway and browser build. Real-phone cellular access, sustained multi-device operation and capacity testing remain to be completed; the per-desktop stream limit is not a measured user-capacity figure.
 
 ## License
 

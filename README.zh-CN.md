@@ -2,18 +2,20 @@
 
 [English](README.md) · 简体中文
 
-独立、可自行部署的 Go 中继，让手机浏览器在局域网外访问 Pudding 桌面端。采用 Apache-2.0 许可证，无 Cloudflare 运行时依赖。
+独立、可自行部署的 Go 中继，让手机或另一台电脑通过浏览器在局域网外访问 Pudding 桌面端。采用 Apache-2.0 许可证，无 Cloudflare 运行时依赖。
 
-服务已实现受鉴权的反向隧道、有界 REST/SSE 转发、持久化桌面凭据摘要，以及轻量中英双语管理页。手机访问需要兼容的 Pudding 桌面网关和共享手机 Web 构建。Docker 发行镜像包含匹配的浏览器资源，用户无需手动复制。Go 服务及其开发镜像仍可独立构建，无需访问私有桌面仓库。
+服务已实现受鉴权的反向隧道、有界 REST/SSE 转发、持久化桌面凭据摘要，以及轻量中英双语管理页。浏览器访问需要兼容的 Pudding 桌面网关和共享浏览器构建。Docker 发行镜像包含匹配的浏览器资源，用户无需手动复制。Go 服务及其开发镜像仍可独立构建，无需访问私有桌面仓库。
 
 ## 接入流程
 
 1. 按下方一键安装部署 HTTP 后端，无需填写域名或准备证书。安装器生成管理员密钥并启动含浏览器资源的镜像；公网 HTTPS 由已有反向代理处理。
 2. 在 Pudding **设置 → 远程访问**复制桌面 ID。打开自己 relay 的 `/admin`，登记此 ID，复制仅显示一次的桌面接入凭据。
 3. 在 Pudding 中继设置填写 relay HTTPS origin 和接入凭据，保存并等待“已连接”。
-4. 在电脑点击“生成授权二维码”，手机扫码后点“连接”。无需输入设备名或再次在电脑批准；授权码五分钟有效，只能使用一次。
+4. 在电脑点击“生成授权二维码”，手机扫码，或将授权链接复制到另一台电脑的浏览器，再点“连接”。无需输入设备名或再次在电脑批准；授权码五分钟有效，只能使用一次。
 
 电脑显示已配对设备和配对时间。“取消配对”立即撤销浏览器访问，不取消已经接受的任务。relay 管理页撤销桌面接入凭据则会断开该电脑的整条隧道。
+
+一个 relay 支持登记多台 Pudding 电脑，每台有独立的桌面 ID、凭据和隧道，每台电脑也可以配对多个浏览器。桌面 ID 保存在电脑的本地数据库中，重启、升级或 IP 变化不会改变。使用新的数据目录或删除该数据库会生成新 ID。将数据库复制到另一台电脑也会复制 ID；同一个 ID 不能同时建立两条活动隧道。
 
 ## 连接方式与边界
 
@@ -21,14 +23,14 @@ Pudding 支持两个可独立启用、同时使用的入口：
 
 | 方式 | 路径 |
 | --- | --- |
-| 局域网直连 / LAN Direct | 手机 → 桌面 HTTP 网关 → loopback daemon；不经过本中继 |
-| 中继连接 / Relay | 手机 → 公网 HTTPS 中继 → 经桌面主动建立的 WSS 隧道 → 桌面网关 → loopback daemon |
+| 局域网直连 / LAN Direct | 浏览器 → 桌面 HTTP 网关 → loopback daemon；不经过本中继 |
+| 中继连接 / Relay | 浏览器 → 公网 HTTPS 中继 → 经桌面主动建立的 WSS 隧道 → 桌面网关 → loopback daemon |
 
-局域网直连由 Pudding 桌面端提供。两种入口复用手机 Web、桌面授权码、路由授权和业务处理。daemon 仅监听 loopback，启动 token 留在电脑。用户明确打开对应入口，首版不自动发现或切换。直连与中继分别建立浏览器登录，共用桌面授权模型。局域网在信任的本地网络使用免证书 HTTP；中继继续要求公网 HTTPS／WSS。局域网 IP 改变后需打开新地址并重新配对。
+局域网直连由 Pudding 桌面端提供。两种入口复用浏览器界面、桌面授权码、路由授权和业务处理。daemon 仅监听 loopback，启动 token 留在电脑。用户明确打开对应入口，目前不自动发现或切换。直连与中继分别建立浏览器登录，共用桌面授权模型。局域网在信任的本地网络使用 HTTP；中继继续要求公网 HTTPS／WSS。局域网 IP 改变后需打开新地址并重新配对。
 
 业务请求保留 REST，会话事件保留支持 `Last-Event-ID` 续传的 SSE。会话、任务、审批和文件留在电脑。relay 仅持久化桌面 ID、名称、创建时间及 SHA-256 凭据摘要，不持久化会话数据，不记录 token、cookie、请求正文或消息内容。HTTPS/WSS 保护每段连接，不代表跨中继端到端加密，用户需要信任部署者。仅运行一个 relay 实例，独占登记文件。
 
-手机首版覆盖会话、流式结果、附件、取消、用户补答和 Pudding 审批；完整远程桌面控制、系统原生授权、语音与离线执行不在范围内。Pudding 须保持运行，入口须可达。直连不依赖中继可用性，模型和工具仍可能需要外网。
+兼容的浏览器构建支持会话（包括流式结果、附件、取消、用户补答和审批）、Studio 文档与表格、定时任务、已安装应用状态及已授权项目文件。具体操作由桌面网关的授权策略决定；原生设置和系统能力仍在电脑端操作。目前不提供完整远程桌面控制、语音与离线执行。Pudding 须保持运行，入口须可达。直连不依赖中继可用性，模型和工具仍可能需要外网。
 
 ## 一键安装
 
@@ -96,7 +98,7 @@ make run
 | --- | --- |
 | `--listen` | HTTP 监听，默认 `127.0.0.1:9623` |
 | `--data-file` | 摘要登记文件，默认 `data/registrations.json` |
-| `--assets-dir` | 共享手机构建目录；环境变量 `PUDDING_RELAY_ASSETS_DIR` |
+| `--assets-dir` | 共享浏览器构建目录；环境变量 `PUDDING_RELAY_ASSETS_DIR` |
 | `PUDDING_RELAY_ADMIN_SECRET_FILE` | 必需的管理员密钥文件，去除首尾空白后至少 32 字节 |
 
 `make build` 输出 `bin/pudding-relay` 并嵌入 Git 提交，版本来自 `VERSION` 文件，`COMMIT` 可覆盖提交元数据。`--version` 无需服务配置即可显示版本。SIGINT/SIGTERM 关闭隧道、唤醒活动流并关闭 HTTP。登记文件原子替换；POSIX 系统文件权限为 `0600`，新建目录为 `0700`。Windows 使用数据目录的 ACL 权限。安全备份该文件；遗失凭据需撤销后重建。
@@ -124,9 +126,9 @@ docker compose down
 
 代理须支持 WebSocket upgrade 和不缓冲的 SSE，允许适合部署的附件大小，且不记录凭据、cookie、正文内容。不要将 relay 内部 HTTP 监听直接暴露到公网。真实手机需要受信任的 HTTPS。密钥文件不得提交到版本库；轮换时替换文件并重启 relay。桌面凭据通过 admin 独立撤销。
 
-本功能尚未发布，请使用兼容的桌面构建。桌面包内含匹配版本的手机资源：macOS 路径为 `Pudding.app/Contents/Resources/app/web/dist/remote`，Windows 为 `<安装目录>/resources/app/web/dist/remote`。将目录内容复制到 `mobile-dist`，即可在无需私有源码的情况下部署；维护者也可从匹配的桌面源码构建 `web/dist/remote`。发行 target 会包含这些资源；本节仅供源码开发和自行构建。
+源码开发或自行构建镜像时，使用兼容桌面构建的浏览器资源。桌面包内含匹配资源：macOS 路径为 `Pudding.app/Contents/Resources/app/web/dist/remote`，Windows 为 `<安装目录>/resources/app/web/dist/remote`。将目录内容复制到 `mobile-dist`，即可在无需私有源码的情况下部署；维护者也可从匹配的桌面源码构建 `web/dist/remote`。已发布的发行镜像内置这些资源，正常安装不需要单独挂载网页目录。
 
-安装手机资源时，只读挂载共享构建，并将 `PUDDING_RELAY_ASSETS_DIR` 设为容器路径，例如覆盖配置：
+为自定义镜像安装浏览器资源时，只读挂载共享构建，并将 `PUDDING_RELAY_ASSETS_DIR` 设为容器路径，例如覆盖配置：
 
 ```yaml
 services:
@@ -137,7 +139,7 @@ services:
       - ./mobile-dist:/assets:ro
 ```
 
-共享 HTML 使用 `<base href="__PUDDING_REMOTE_BASE__" />`；relay 将标记替换为 `/d/{desktopID}/`，CSP 允许同源 base。`/pair`、`/s/{sessionID}` 深链接返回该 HTML，使相对资源定位到桌面基路径。桌面离线时仍可加载资源，业务请求明确返回 `503`。缺少 `index.html` 时显示安装提示，不提供替代手机客户端。
+共享 HTML 使用 `<base href="__PUDDING_REMOTE_BASE__" />`；relay 将标记替换为 `/d/{desktopID}/`，CSP 允许同源 base。`/pair`、`/s/{sessionID}` 深链接返回该 HTML，使相对资源定位到桌面基路径。桌面离线时仍可加载资源，业务请求明确返回 `503`。缺少 `index.html` 时显示安装提示，不提供替代浏览器客户端。
 
 ## Admin 与接口
 
@@ -154,9 +156,9 @@ services:
 | `DELETE /admin/api/desktops/{desktopID}` | 204，持久化撤销并关闭活动隧道 |
 | `GET /tunnel` | WebSocket v1，首帧鉴权 |
 | `/d/{desktopID}/api/*`、`/d/{desktopID}/remote/*` | 通过已登记桌面网关转发 HTTP；离线 → 503 |
-| `GET /d/{desktopID}/…` | 已安装手机资源；未知桌面 → 404 |
+| `GET /d/{desktopID}/…` | 已安装浏览器资源；未知桌面 → 404 |
 
-手机配对、登录及路由授权由桌面网关负责。relay 无法绕过网关，也不能代理任意目标。转发 Cookie、`Origin`、`Last-Event-ID`；删除 authorization、host、hop-by-hop、forwarded 和传入的 `X-Pudding-*` headers。relay 仅写入 `X-Pudding-Remote-Mode=relay`。浏览器 Origin 保留，由桌面网关按其已配置的 Relay 地址验证配对和业务权限。
+浏览器配对、登录及路由授权由桌面网关负责。relay 无法绕过网关，也不能代理任意目标。转发 Cookie、`Origin`、`Last-Event-ID`；删除 authorization、host、hop-by-hop、forwarded 和传入的 `X-Pudding-*` headers。relay 仅写入 `X-Pudding-Remote-Mode=relay`。浏览器 Origin 保留，由桌面网关按其已配置的 Relay 地址验证配对和业务权限。
 
 ## 隧道协议 v1
 
@@ -222,7 +224,7 @@ make test-install
 git diff --check
 ```
 
-`make check` 检查格式、运行 vet 和 race detector 测试。覆盖摘要持久化和重启、文件权限、并发登记、管理员鉴权、撤销断线、协议校验与关闭管理接口 CORS、有界帧和流、上传、SSE、可信 headers、取消、退出以及手机深链接。CI 还构建并冒烟测试容器。桌面和真实手机联调需要兼容网关及已安装手机构建。
+`make check` 检查格式、运行 vet 和 race detector 测试。覆盖摘要持久化和重启、文件权限、并发登记、管理员鉴权、撤销断线、协议校验与关闭管理接口 CORS、有界帧和流、上传、SSE、可信 headers、取消、退出以及浏览器深链接。CI 还构建并冒烟测试容器。桌面与浏览器联调需要兼容网关及浏览器构建。真机手机蜂窝网络、长时多设备运行和容量测试仍待完成；每桌面的活动流上限不代表已测定的用户容量。
 
 ## 许可证
 
