@@ -14,12 +14,11 @@ function fixture(t) {
 const fs=require('node:fs');const args=process.argv.slice(2);
 fs.appendFileSync(process.env.DOCKER_CALLS,JSON.stringify(args)+'\\n');
 if(args[0]==='pull'&&process.env.FAIL_PULL==='1')process.exit(1);
-if(args[0]==='run'&&process.env.FAIL_ASSETS==='1')process.exit(1);
 if(args[0]==='network'&&process.env.FAIL_NETWORK==='1')process.exit(1);
 `, { mode: 0o755 });
   const directory = path.join(root, 'installed relay');
   const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, INSTALL_DIR: directory, DOCKER_CALLS: path.join(root, 'calls') };
-  for (const key of ['IMAGE', 'PORT', 'BIND_ADDRESS', 'NETWORK', 'FAIL_PULL', 'FAIL_ASSETS', 'FAIL_NETWORK', 'PUBLIC_URL', 'TRUSTED_PROXIES']) delete env[key];
+  for (const key of ['IMAGE', 'PORT', 'BIND_ADDRESS', 'NETWORK', 'FAIL_PULL', 'FAIL_NETWORK', 'PUBLIC_URL', 'TRUSTED_PROXIES']) delete env[key];
   const run = (overrides = {}) => spawnSync('sh', [installer], { env: { ...env, ...overrides }, encoding: 'utf8' });
   return { root, directory, env, run, calls: () => fs.readFileSync(env.DOCKER_CALLS, 'utf8').trim().split('\n').map(line => JSON.parse(line)) };
 }
@@ -43,7 +42,7 @@ test('install/reinstall preserves admin credentials and configuration, treating 
   assert.match(config, /PORT=19080\n/); assert.match(config, /NETWORK=existing-proxy\n/); assert.match(config, /# keep comment/); assert.match(config, /UNRELATED=/);
   assert.equal(fs.statSync(configPath).mode & 0o777, 0o600);
   assert.match(fs.readFileSync(path.join(f.directory, 'compose.yaml'), 'utf8'), /external: true/);
-  assert.doesNotMatch(fs.readFileSync(path.join(f.directory, 'compose.yaml'), 'utf8'), /TRUSTED_PROXIES/);
+  assert.doesNotMatch(fs.readFileSync(path.join(f.directory, 'compose.yaml'), 'utf8'), /TRUSTED_PROXIES|PUDDING_RELAY_ASSETS_DIR/);
   result = f.run({ PORT: '19081', NETWORK: '' }); assert.equal(result.status, 0, result.stderr);
   assert.match(fs.readFileSync(configPath, 'utf8'), /PORT=19081\n/);
   assert.match(fs.readFileSync(configPath, 'utf8'), /NETWORK=\n/);
@@ -51,13 +50,11 @@ test('install/reinstall preserves admin credentials and configuration, treating 
   assert.equal(fs.readFileSync(secretPath, 'utf8'), secret);
 });
 
-test('failed pulls and missing browser resources do not replace a working installation', t => {
+test('failed pulls do not replace a working installation', t => {
   const f = fixture(t); const result = f.run(); assert.equal(result.status, 0, result.stderr);
   const before = Object.fromEntries(['.env', 'compose.yaml', 'makefile', 'secrets/admin-secret'].map(file => [file, fs.readFileSync(path.join(f.directory, file))]));
-  for (const failure of [{ FAIL_PULL: '1' }, { FAIL_ASSETS: '1' }]) {
-    const result = f.run({ ...failure, PORT: '19081' }); assert.notEqual(result.status, 0);
-    for (const [file, bytes] of Object.entries(before)) assert.deepEqual(fs.readFileSync(path.join(f.directory, file)), bytes);
-  }
+  const failed = f.run({ FAIL_PULL: '1', PORT: '19081' }); assert.notEqual(failed.status, 0);
+  for (const [file, bytes] of Object.entries(before)) assert.deepEqual(fs.readFileSync(path.join(f.directory, file)), bytes);
 });
 
 test('noninteractive installs need no public URL and reject invalid configuration before pulling', t => {
@@ -70,6 +67,7 @@ test('noninteractive installs need no public URL and reject invalid configuratio
   assert.ok(f.calls().every(args => args[0] !== 'pull'));
   const result = f.run(); assert.equal(result.status, 0, result.stderr);
   assert.doesNotMatch(result.stdout, /Public HTTPS URL/);
+  assert.ok(f.calls().every(args => args[0] !== 'run'), 'installation never checks for a bundled desktop UI');
   assert.doesNotMatch(fs.readFileSync(path.join(f.directory, '.env'), 'utf8'), /PUBLIC_URL/);
   assert.match(fs.readFileSync(path.join(f.directory, '.env'), 'utf8'), /PORT=9623\n/);
 });

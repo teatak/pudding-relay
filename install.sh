@@ -35,7 +35,6 @@ fi
 
 # A failed image download must not replace a working installation's settings.
 docker pull "$IMAGE"
-docker run --rm --entrypoint /bin/sh "$IMAGE" -c 'test -r /assets/index.html' || fail 'This image is missing the browser UI.' '此镜像缺少浏览器界面资源。'
 
 mkdir -p secrets
 chmod 700 secrets
@@ -85,7 +84,6 @@ services:
         host_ip: "${BIND_ADDRESS}"
     environment:
       PUDDING_RELAY_ADMIN_SECRET_FILE: /run/secrets/admin_secret
-      PUDDING_RELAY_ASSETS_DIR: /assets
     secrets:
       - admin_secret
     volumes:

@@ -10,8 +10,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -33,7 +31,6 @@ var errFrameTooLarge = errors.New("frame exceeds limit")
 type Config struct {
 	AdminSecret string
 	Store       *Store
-	AssetsDir   string
 }
 type Relay struct {
 	cfg     Config
@@ -325,15 +322,9 @@ func (r *Relay) forward(w http.ResponseWriter, req *http.Request) {
 		http.NotFound(w, req)
 		return
 	}
-	prefix := "/d/" + id
-	path := strings.TrimPrefix(req.URL.Path, prefix)
-	if !strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/remote/") {
-		r.assets(w, req, prefix, path)
-		return
-	}
 	// Preserve browser encoding (notably request IDs containing %3A) on the
 	// wire; the desktop gateway and core decode each segment at their boundary.
-	path = "/" + strings.SplitN(req.URL.EscapedPath(), "/", 4)[3]
+	path := "/" + strings.SplitN(req.URL.EscapedPath(), "/", 4)[3]
 	r.mu.Lock()
 	t := r.tunnels[id]
 	r.mu.Unlock()
@@ -438,7 +429,6 @@ func (r *Relay) forward(w http.ResponseWriter, req *http.Request) {
 				for k, v := range cleanHeadersFromMap(f.Headers) {
 					w.Header().Set(k, v)
 				}
-				w.Header().Set("Cache-Control", "no-store")
 				w.WriteHeader(f.Status)
 				started = true
 				if fl, ok := w.(http.Flusher); ok {
@@ -470,49 +460,6 @@ func cleanHeadersFromMap(m map[string]string) map[string]string {
 		h.Set(k, v)
 	}
 	return cleanHeaders(h)
-}
-func (r *Relay) assets(w http.ResponseWriter, req *http.Request, prefix, path string) {
-	if req.Method != http.MethodGet && req.Method != http.MethodHead {
-		http.NotFound(w, req)
-		return
-	}
-	r.mu.Lock()
-	registered := false
-	for _, e := range r.cfg.Store.List() {
-		if e.DesktopID == req.PathValue("desktopID") {
-			registered = true
-			break
-		}
-	}
-	r.mu.Unlock()
-	if !registered {
-		http.NotFound(w, req)
-		return
-	}
-	_, assetsErr := os.Stat(filepath.Join(r.cfg.AssetsDir, "index.html"))
-	if r.cfg.AssetsDir == "" || assetsErr != nil {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_, _ = io.WriteString(w, "<!doctype html><html lang=en><meta charset=utf-8><title>Pudding setup</title><h1>Mobile Web assets required / 需要手机 Web 资源</h1><p>Install the Pudding mobile Web build and set --assets-dir. / 请安装 Pudding 手机 Web 构建并设置 --assets-dir。</p>")
-		return
-	}
-	if path == "/" || path == "/index.html" || path == "/pair" || strings.HasPrefix(path, "/s/") {
-		data, err := os.ReadFile(filepath.Join(r.cfg.AssetsDir, "index.html"))
-		if err != nil {
-			errorJSON(w, http.StatusServiceUnavailable, "mobile assets unavailable")
-			return
-		}
-		html := strings.ReplaceAll(string(data), "__PUDDING_REMOTE_BASE__", prefix+"/")
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		if req.Method != http.MethodHead {
-			_, _ = io.WriteString(w, html)
-		}
-		return
-	}
-	http.StripPrefix(prefix, http.FileServer(http.Dir(r.cfg.AssetsDir))).ServeHTTP(w, req)
 }
 func (r *Relay) authorized(w http.ResponseWriter, req *http.Request) bool {
 	header := req.Header.Get("Authorization")

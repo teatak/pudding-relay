@@ -47,14 +47,8 @@ jobs:
       - name: Stop containers
         if: always()
         run: docker compose down --volumes
-      - name: Build installer test distribution
-        run: |
-          mkdir -p /tmp/relay-ui/assets
-          printf '<!doctype html><base href="__PUDDING_REMOTE_BASE__"><script src="./assets/smoke.js"></script>' > /tmp/relay-ui/index.html
-          printf '// installer fixture\n' > /tmp/relay-ui/assets/smoke.js
-          mkdir -p /tmp/relay-ui/licenses
-          printf 'Fixture license\n' > /tmp/relay-ui/licenses/PUDDING-LICENSE.txt
-          docker build --build-context browser=/tmp/relay-ui -t pudding-relay:install-test .
+      - name: Build installer image
+        run: docker build -t pudding-relay:install-test .
       - name: Test real install and data preservation
         env:
           PUDDING_RELAY_TEST_IMAGE: pudding-relay:install-test

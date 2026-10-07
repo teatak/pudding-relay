@@ -2,7 +2,6 @@ services:
   relay:
     build:
       context: .
-      target: server
     image: pudding-relay:local
     ports:
       - "127.0.0.1:${PUDDING_RELAY_PORT:-9623}:9623"

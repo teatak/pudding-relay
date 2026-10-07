@@ -24,7 +24,6 @@ var (
 func main() {
 	listen := flag.String("listen", "127.0.0.1:9623", "HTTP listen address / HTTP 监听地址")
 	dataFile := flag.String("data-file", "data/registrations.json", "Registration digest file / 登记摘要文件")
-	assetsDir := flag.String("assets-dir", os.Getenv("PUDDING_RELAY_ASSETS_DIR"), "Mobile Web build directory / 手机 Web 构建目录")
 	showVersion := flag.Bool("version", false, "Print build version / 显示构建版本")
 	flag.Parse()
 	if flag.NArg() != 0 {
@@ -53,7 +52,7 @@ func main() {
 		slog.Error("cannot open registration store")
 		os.Exit(1)
 	}
-	cfg := httpserver.Config{AdminSecret: strings.TrimSpace(string(secret)), Store: store, AssetsDir: *assetsDir}
+	cfg := httpserver.Config{AdminSecret: strings.TrimSpace(string(secret)), Store: store}
 	if err := serve(ctx, *listen, cfg); err != nil {
 		slog.Error("relay stopped", "error", err)
 		os.Exit(1)

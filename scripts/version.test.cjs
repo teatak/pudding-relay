@@ -36,7 +36,7 @@ test('release publishes current version once, increments patch and keeps source/
   git('add', '.'); git('commit', '-m', 'initial');
   const origin = path.join(f.parent, 'origin.git'); execFileSync('git', ['init', '--bare', origin], { stdio: 'ignore' });
   git('remote', 'add', 'origin', origin); git('push', '-u', 'origin', 'main');
-  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, WEB_ASSETS_DIR: f.parent, WEB_LEGAL_DIR: f.parent, RELEASE_LOG: path.join(f.parent, 'released') };
+  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, RELEASE_LOG: path.join(f.parent, 'released') };
   let result = f.run('release.sh', 'current', env); assert.equal(result.status, 0, result.stderr);
   assert.equal(git('show', 'v0.1.0:VERSION'), '0.1.0');
   result = f.run('release.sh', 'current', env); assert.notEqual(result.status, 0);

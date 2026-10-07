@@ -4,11 +4,11 @@
 
 独立、可自行部署的 Go 中继，让手机或另一台电脑通过浏览器在局域网外访问 Pudding 桌面端。采用 Apache-2.0 许可证，无 Cloudflare 运行时依赖。
 
-服务已实现受鉴权的反向隧道、有界 REST/SSE 转发、持久化桌面凭据摘要，以及轻量中英双语管理页。浏览器访问需要兼容的 Pudding 桌面网关和共享浏览器构建。Docker 发行镜像包含匹配的浏览器资源，用户无需手动复制。Go 服务及其开发镜像仍可独立构建，无需访问私有桌面仓库。
+服务已实现受鉴权的反向隧道、有界 REST/SSE 转发、持久化桌面凭据摘要，以及轻量中英双语管理页。Pudding 桌面端通过隧道提供自身的浏览器界面、配对和业务接口。中继镜像只包含中继服务及其管理页，构建不依赖桌面仓库。更新 Pudding 即可更新远程界面，无需重新构建或升级中继。
 
 ## 接入流程
 
-1. 按下方一键安装部署 HTTP 后端，无需填写域名或准备证书。安装器生成管理员密钥并启动含浏览器资源的镜像；公网 HTTPS 由已有反向代理处理。
+1. 按下方一键安装部署 HTTP 后端，无需填写域名或准备证书。安装器生成管理员密钥并启动中继；公网 HTTPS 由已有反向代理处理。
 2. 在 Pudding **设置 → 远程访问**复制桌面 ID。打开自己 relay 的 `/admin`，登记此 ID，复制仅显示一次的桌面接入凭据。
 3. 在 Pudding 中继设置填写 relay HTTPS origin 和接入凭据，保存并等待“已连接”。
 4. 在电脑点击“生成授权二维码”，手机扫码，或将授权链接复制到另一台电脑的浏览器，再点“连接”。无需输入设备名或再次在电脑批准；授权码五分钟有效，只能使用一次。
@@ -30,13 +30,13 @@ Pudding 支持两个可独立启用、同时使用的入口：
 
 业务请求保留 REST，会话事件保留支持 `Last-Event-ID` 续传的 SSE。会话、任务、审批和文件留在电脑。relay 仅持久化桌面 ID、名称、创建时间及 SHA-256 凭据摘要，不持久化会话数据，不记录 token、cookie、请求正文或消息内容。HTTPS/WSS 保护每段连接，不代表跨中继端到端加密，用户需要信任部署者。仅运行一个 relay 实例，独占登记文件。
 
-Relay 0.1.6 起，浏览器以 canonical 轮次快照同步后台会话结束状态，修复切换会话后运行指示持续转圈的问题。
+浏览器 HTML、脚本、样式和字体由所选电脑的桌面网关提供。同一中继上的不同电脑各自提供自己的界面版本。中继转发桌面返回的状态、内容类型、缓存和安全响应头。电脑离线时，网页和接口请求返回 `503`，中继管理页仍可访问。
 
 兼容的浏览器构建支持会话（包括流式结果、附件、取消、用户补答和审批）、Studio 文档与表格、定时任务、已安装应用状态及已授权项目文件。具体操作由桌面网关的授权策略决定；原生设置和系统能力仍在电脑端操作。目前不提供完整远程桌面控制、语音与离线执行。Pudding 须保持运行，入口须可达。直连不依赖中继可用性，模型和工具仍可能需要外网。
 
 ## 一键安装
 
-公开的 [Docker Hub 镜像](https://hub.docker.com/r/teatak/pudding-relay)已包含浏览器界面，支持 Linux amd64／arm64。
+公开的 [Docker Hub 镜像](https://hub.docker.com/r/teatak/pudding-relay)支持 Linux amd64／arm64。
 
 先安装 Docker Engine 和 Docker Compose v2，然后在服务器运行：
 
@@ -46,7 +46,7 @@ cd pudding-relay
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh | sh
 ```
 
-安装不询问域名或 HTTPS 地址。Relay 提供 HTTP 后端，外部 HTTPS 由现有反向代理处理。安装成功显示本机 HTTP 管理地址、绑定地址和管理员密钥文件位置，密钥内容不会输出到日志。镜像包含共享浏览器界面，支持 Linux amd64／arm64。
+安装不询问域名或 HTTPS 地址。Relay 提供 HTTP 后端，外部 HTTPS 由现有反向代理处理。安装成功显示本机 HTTP 管理地址、绑定地址和管理员密钥文件位置，密钥内容不会输出到日志。镜像包含中继服务及其管理页，支持 Linux amd64／arm64。
 
 非交互安装可以直接传入参数：
 
@@ -80,7 +80,7 @@ make status    # 查看状态
 
 安装器不配置域名、TLS 或系统 Docker 服务。外部代理须支持 WebSocket 和不缓冲的 SSE。停止时不要添加 `--volumes`，除非有意删除登记数据。桌面远程功能尚未正式发布，需使用包含此功能的兼容桌面构建。
 
-Go 中继源码遵循 Apache-2.0；镜像中已编译的 Pudding 浏览器资源遵循其 Pudding Desktop 许可，相关许可和第三方声明一并附带，不公开桌面私有源码。
+中继源码及其管理页遵循 Apache-2.0，镜像附带中继许可和依赖声明。Pudding 浏览器资源保留在桌面安装包中，经隧道提供。
 
 ## 本地开发
 
@@ -100,7 +100,6 @@ make run
 | --- | --- |
 | `--listen` | HTTP 监听，默认 `127.0.0.1:9623` |
 | `--data-file` | 摘要登记文件，默认 `data/registrations.json` |
-| `--assets-dir` | 共享浏览器构建目录；环境变量 `PUDDING_RELAY_ASSETS_DIR` |
 | `PUDDING_RELAY_ADMIN_SECRET_FILE` | 必需的管理员密钥文件，去除首尾空白后至少 32 字节 |
 
 `make build` 输出 `bin/pudding-relay` 并嵌入 Git 提交，版本来自 `VERSION` 文件，`COMMIT` 可覆盖提交元数据。`--version` 无需服务配置即可显示版本。SIGINT/SIGTERM 关闭隧道、唤醒活动流并关闭 HTTP。登记文件原子替换；POSIX 系统文件权限为 `0600`，新建目录为 `0700`。Windows 使用数据目录的 ACL 权限。安全备份该文件；遗失凭据需撤销后重建。
@@ -122,26 +121,13 @@ curl --fail http://127.0.0.1:9623/healthz
 docker compose down
 ```
 
-此源码 Compose 构建 `server` 开发 target，仅映射宿主机 loopback，将管理员密钥挂载为文件，在 `relay_data` 卷持久化摘要。镜像使用非 root 用户、只读文件系统并移除 capabilities。用户安装采用上方含浏览器资源的 Docker Hub 发行镜像。设置 `PUDDING_RELAY_PORT=18080` 可更改宿主机端口。除非有意删除全部登记，不使用 `down --volumes`。
+此源码 Compose 构建中继镜像，仅映射宿主机 loopback，将管理员密钥挂载为文件，在 `relay_data` 卷持久化摘要。镜像使用非 root 用户、只读文件系统并移除 capabilities。用户安装采用上方 Docker Hub 镜像。设置 `PUDDING_RELAY_PORT=18080` 可更改宿主机端口。除非有意删除全部登记，不使用 `down --volumes`。
 
 将反向代理指向 Relay HTTP 后端即可，无需填写可信代理网段或自定义 `/admin/api/` location。桌面与浏览器的配对仍验证已配置公网地址的精确 Origin。
 
 代理须支持 WebSocket upgrade 和不缓冲的 SSE，允许适合部署的附件大小，且不记录凭据、cookie、正文内容。不要将 relay 内部 HTTP 监听直接暴露到公网。真实手机需要受信任的 HTTPS。密钥文件不得提交到版本库；轮换时替换文件并重启 relay。桌面凭据通过 admin 独立撤销。
 
-源码开发或自行构建镜像时，使用兼容桌面构建的浏览器资源。桌面包内含匹配资源：macOS 路径为 `Pudding.app/Contents/Resources/app/web/dist/remote`，Windows 为 `<安装目录>/resources/app/web/dist/remote`。将目录内容复制到 `mobile-dist`，即可在无需私有源码的情况下部署；维护者也可从匹配的桌面源码构建 `web/dist/remote`。已发布的发行镜像内置这些资源，正常安装不需要单独挂载网页目录。
-
-为自定义镜像安装浏览器资源时，只读挂载共享构建，并将 `PUDDING_RELAY_ASSETS_DIR` 设为容器路径，例如覆盖配置：
-
-```yaml
-services:
-  relay:
-    environment:
-      PUDDING_RELAY_ASSETS_DIR: /assets
-    volumes:
-      - ./mobile-dist:/assets:ro
-```
-
-共享 HTML 使用 `<base href="__PUDDING_REMOTE_BASE__" />`；relay 将标记替换为 `/d/{desktopID}/`，CSP 允许同源 base。`/pair`、`/s/{sessionID}` 深链接返回该 HTML，使相对资源定位到桌面基路径。桌面离线时仍可加载资源，业务请求明确返回 `503`。缺少 `index.html` 时显示安装提示，不提供替代浏览器客户端。
+浏览器界面由 Pudding 桌面端部署。桌面网关从自身安装包返回 `/`、`/index.html`、`/pair` 和 `/s/{sessionID}` 页面，替换桌面基路径，并在 `/d/{desktopID}/` 下提供相对资源。这些请求均经过已鉴权的隧道。Relay 不托管、改写或缓存独立的 Pudding 网页副本。
 
 ## Admin 与接口
 
@@ -157,8 +143,7 @@ services:
 | `POST /admin/api/desktops` | JSON `{"desktopID":"existing-core-id","label":"My desktop"}` → 201，含 `desktopID`、`label`、`createdAt`、一次性 `token`；重复 ID → 409 |
 | `DELETE /admin/api/desktops/{desktopID}` | 204，持久化撤销并关闭活动隧道 |
 | `GET /tunnel` | WebSocket v1，首帧鉴权 |
-| `/d/{desktopID}/api/*`、`/d/{desktopID}/remote/*` | 通过已登记桌面网关转发 HTTP；离线 → 503 |
-| `GET /d/{desktopID}/…` | 已安装浏览器资源；未知桌面 → 404 |
+| `/d/{desktopID}/*` | 通过已登记桌面隧道转发页面、资源、配对接口和业务 REST/SSE；离线 → 503 |
 
 浏览器配对、登录及路由授权由桌面网关负责。relay 无法绕过网关，也不能代理任意目标。转发 Cookie、`Origin`、`Last-Event-ID`；删除 authorization、host、hop-by-hop、forwarded 和传入的 `X-Pudding-*` headers。relay 仅写入 `X-Pudding-Remote-Mode=relay`。浏览器 Origin 保留，由桌面网关按其已配置的 Relay 地址验证配对和业务权限。
 
@@ -178,17 +163,13 @@ services:
 
 ## 构建发行镜像
 
-维护者提供已编译的共享浏览器目录和对应许可目录，二者不提交到本仓：
+直接从本仓构建：
 
 ```sh
-WEB_ASSETS_DIR=/path/to/pudding/web/dist/remote \
-WEB_LEGAL_DIR=/path/to/pudding/dist/legal \
 make docker-build
 ```
 
-`VERSION` 是版本号的唯一来源，初始版本为 `0.1.0`。`make docker-publish` 使用同样的输入发布 Linux amd64／arm64 镜像，同时生成 `latest` 和固定版本标签；可通过 `IMAGE` 指定镜像目标。需要当前 Docker 用户有目标仓库的推送权限。`scripts/build-image.sh` 校验 Pudding 的 base 标记和许可，将编译资源通过独立构建 context 放入镜像，不复制私有源码或 source map。
-
-源码 Go 服务镜像可用 `docker build --target server .` 独立构建；完整发行 target 需要 `browser` context。CI 的资源 fixture 只用于安装及持久化验收，不作为发行资源发布。
+`VERSION` 是版本号的唯一来源。`make docker-publish` 发布 Linux amd64／arm64 镜像，同时生成 `latest` 和固定版本标签；可通过 `IMAGE` 指定目标，需要 Docker 用户具备推送权限。无需桌面仓库、浏览器目录或额外 build context。`docker build .` 构建相同的独立镜像。
 
 ## 版本与发版
 
@@ -205,7 +186,7 @@ make release-minor
 make release-major
 ```
 
-发版前需要在 main 提交源码，并提供上方浏览器资源／许可目录及 Docker Hub 推送权限。脚本同步远端与 Git tags、执行测试、按需提交版本更新、推送双架构镜像，然后原子推送 main 与 `vX.Y.Z` Git tag。首次 patch 发版使用当前准备好的版本；当前版本已有 tag 时递增 patch。已发版版本拒绝重复发布，镜像失败时不创建 Git tag；修复后重试保留已准备的版本。
+发版前需要在 main 提交源码，并具备 Docker Hub 推送权限。脚本同步远端与 Git tags、执行测试、按需提交版本更新、推送双架构镜像，然后原子推送 main 与 `vX.Y.Z` Git tag。首次 patch 发版使用当前准备好的版本；当前版本已有 tag 时递增 patch。已发版版本拒绝重复发布，镜像失败时不创建 Git tag；修复后重试保留已准备的版本。
 
 固定版本安装：
 
@@ -226,13 +207,15 @@ make test-install
 git diff --check
 ```
 
-`make check` 检查格式、运行 vet 和 race detector 测试。覆盖摘要持久化和重启、文件权限、并发登记、管理员鉴权、撤销断线、协议校验与关闭管理接口 CORS、有界帧和流、上传、SSE、可信 headers、取消、退出以及浏览器深链接。CI 还构建并冒烟测试容器。桌面与浏览器联调需要兼容网关及浏览器构建。真机手机蜂窝网络、长时多设备运行和容量测试仍待完成；每桌面的活动流上限不代表已测定的用户容量。
+`make check` 检查格式、运行 vet 和 race detector 测试。覆盖摘要持久化和重启、文件权限、并发登记、管理员鉴权、撤销断线、协议校验与关闭管理接口 CORS、有界帧和流、上传、SSE、可信 headers、取消、退出以及桌面提供的页面／资源、HEAD、缓存与安全响应头、多电脑界面版本和仅更新桌面网页。CI 还构建并冒烟测试容器。桌面与浏览器联调使用该电脑提供的浏览器构建。真机手机蜂窝网络、长时多设备运行和容量测试仍待完成；每桌面的活动流上限不代表已测定的用户容量。
 
 ## 许可证
 
 [Apache License 2.0](LICENSE)。
 
 ## 从 0.1.0 升级
+
+从 0.1.6 起，Relay 经桌面隧道转发 Pudding 网页及资源，镜像不再附带浏览器构建。现有部署需要为此升级一次中继，之后 Pudding 界面更新只需升级 Pudding。桌面 ID、中继凭据和浏览器授权保留。重新运行安装器可移除 Compose 模板中的网页资源环境项。自定义部署需删除旧 `--assets-dir` 参数、`PUDDING_RELAY_ASSETS_DIR` 环境变量和浏览器资源挂载。
 
 重新运行安装命令，让安装器移除已废弃的 `PUBLIC_URL` 和旧 Compose 环境项，并保留密钥与登记数据；只拉取镜像不会更新旧安装模板。从 0.1.3 起，安装器同时移除已废弃的 `TRUSTED_PROXIES`。镜像升级后，可删除此前为非标准 HTTPS 端口添加的自定义管理路径反代配置。`--public-url`、`--allow-insecure-loopback` 和 `--trusted-proxies` 已删除，不保留旧参数路径。
 

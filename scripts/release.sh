@@ -7,8 +7,6 @@ relay_kind="${1:-patch}"
 case "$relay_kind" in patch|minor|major|current) ;; *) printf 'Use patch/minor/major/current / 请使用 patch/minor/major/current\n' >&2; exit 1 ;; esac
 [ "$(git branch --show-current)" = main ] || { printf 'Release from main / 请在 main 发版\n' >&2; exit 1; }
 [ -z "$(git status --porcelain -- . ':!VERSION')" ] || { printf 'Commit source changes before releasing / 发版前请提交源码改动\n' >&2; exit 1; }
-: "${WEB_ASSETS_DIR:?Set WEB_ASSETS_DIR.}"
-: "${WEB_LEGAL_DIR:?Set WEB_LEGAL_DIR.}"
 command -v docker >/dev/null 2>&1
 # Fetch errors stop publication; do not silently use stale release tags.
 git fetch origin main --tags

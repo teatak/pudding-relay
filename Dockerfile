@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
 
 RUN mkdir -p /out/licenses && cp "$(go list -m -f '{{.Dir}}' github.com/coder/websocket)/LICENSE.txt" /out/licenses/websocket-LICENSE.txt
 
-FROM alpine:3.23 AS server
+FROM alpine:3.23
 RUN mkdir /data && chown 65532:65532 /data
 COPY --from=build /out/pudding-relay /usr/local/bin/pudding-relay
 COPY LICENSE /usr/share/doc/pudding-relay/LICENSE
@@ -25,9 +25,3 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=3s --retries=3 \
     CMD wget -q --spider http://127.0.0.1:9623/healthz || exit 1
 ENTRYPOINT ["pudding-relay"]
 CMD ["--listen=0.0.0.0:9623", "--data-file=/data/registrations.json"]
-
-# The public distribution includes the same compiled UI used by Pudding Desktop.
-# Supply its binary assets as a named build context; private source is not copied.
-FROM server AS distribution
-COPY --from=browser / /assets/
-ENV PUDDING_RELAY_ASSETS_DIR=/assets

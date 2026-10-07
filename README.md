@@ -4,11 +4,11 @@ English · [简体中文](README.zh-CN.md)
 
 A standalone, self-hosted Go relay for accessing Pudding Desktop from a phone or another computer through a browser outside the local network. Apache-2.0 licensed; no Cloudflare runtime dependency.
 
-The server implements authenticated reverse tunnels, bounded REST/SSE forwarding, persistent desktop credential digests, and a lightweight English/Chinese admin interface. Browser access requires a compatible Pudding Desktop gateway and shared browser build. The distribution image bundles matching browser assets, so users do not copy them manually. The Go server and its development image still build independently of the private desktop repository.
+The server implements authenticated reverse tunnels, bounded REST/SSE forwarding, persistent desktop credential digests, and a lightweight English/Chinese admin interface. Pudding Desktop provides its own browser UI through the tunnel, along with pairing and business APIs. The relay image contains only the relay and its admin page; it builds independently of the desktop repository. Updating Pudding updates its remote UI without rebuilding or upgrading the relay.
 
 ## Setup flow
 
-1. Install the HTTP backend using the command below, without a domain or certificate. It generates the admin secret and starts an image containing the browser UI. Your existing reverse proxy handles public HTTPS.
+1. Install the HTTP backend using the command below, without a domain or certificate. It generates the admin secret and starts the relay. Your existing reverse proxy handles public HTTPS.
 2. In Pudding **Settings → Remote access**, copy the desktop ID. Open your relay's `/admin`, register this ID, and copy the desktop credential that is shown once.
 3. In Pudding Relay settings, enter the relay HTTPS origin and credential. Save and wait for **Connected**.
 4. On the desktop, select **Generate authorization QR**. Scan it on the phone, or copy the authorization link into another computer's browser, then select **Connect**. No device-name entry or further desktop approval is needed. The code expires in five minutes and works once.
@@ -30,13 +30,13 @@ LAN Direct belongs to Pudding Desktop. Both entries reuse the browser UI, deskto
 
 Business requests remain REST; session events remain SSE with `Last-Event-ID` resume. Conversations, tasks, approvals and files remain on the desktop. The relay persists only desktop IDs, labels, creation timestamps and SHA-256 credential digests; it does not persist conversation data or log tokens, cookies, request bodies or message contents. HTTPS/WSS protects each connection, not end-to-end encryption across the relay: users must trust its operator. Run exactly one relay instance with exclusive ownership of its registry file.
 
-Starting with Relay 0.1.6, background conversation completion is reconciled from canonical turn snapshots, so switching to another conversation no longer leaves its running indicator stuck.
+Browser HTML, scripts, styles and fonts are served by the selected desktop gateway. Different desktops on the same relay each provide their own UI version. The relay forwards response status, content type, caching and security headers from the desktop. If that desktop is offline, page and API requests return `503`; relay admin remains available.
 
 Compatible browser builds provide conversations (including streaming, attachments, cancellation, user questions and approvals), Studio documents and tables, scheduled tasks, installed-app status, and authorized project files. Available operations follow the desktop gateway's authorization policy; native settings and system capabilities remain on the desktop. Full remote desktop control, voice and offline execution are not provided. Pudding must stay running; the selected entry must be reachable. LAN works independently of relay availability; models and tools may still require internet access.
 
 ## One-command installation
 
-The public [Docker Hub image](https://hub.docker.com/r/teatak/pudding-relay) includes the browser UI and supports Linux amd64/arm64.
+The public [Docker Hub image](https://hub.docker.com/r/teatak/pudding-relay) supports Linux amd64/arm64.
 
 Install Docker Engine and Docker Compose v2, then run on the server:
 
@@ -46,7 +46,7 @@ cd pudding-relay
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh | sh
 ```
 
-Installation does not ask for a domain or HTTPS origin. Relay serves HTTP behind your existing HTTPS proxy. Successful installation prints the local HTTP admin URL, bind address and secret-file location, never the secret value. The image includes the shared browser UI and supports Linux amd64/arm64.
+Installation does not ask for a domain or HTTPS origin. Relay serves HTTP behind your existing HTTPS proxy. Successful installation prints the local HTTP admin URL, bind address and secret-file location, never the secret value. The image contains the relay and its admin page and supports Linux amd64/arm64.
 
 For a noninteractive install, pass the settings directly:
 
@@ -80,7 +80,7 @@ make status    # Show status
 
 The installer does not configure DNS, TLS or the system Docker service. The external proxy must support WebSocket and unbuffered SSE. Do not add `--volumes` when stopping unless intentionally deleting registrations. Desktop remote access is not formally released; use a compatible desktop build containing this feature.
 
-The Go relay source is Apache-2.0 licensed. Compiled Pudding browser assets in the image follow the Pudding Desktop license; that license and third-party notices are included, without publishing private desktop source.
+The relay source and its admin page are Apache-2.0 licensed. The image includes the relay license and its dependency notice. Pudding browser assets remain in the desktop installation and are delivered through the tunnel.
 
 ## Local development
 
@@ -100,7 +100,6 @@ The default listener is `127.0.0.1:9623`; HTTP admin works directly in a trusted
 | --- | --- |
 | `--listen` | HTTP listener, default `127.0.0.1:9623` |
 | `--data-file` | Digest registry, default `data/registrations.json` |
-| `--assets-dir` | Shared browser build directory; environment: `PUDDING_RELAY_ASSETS_DIR` |
 | `PUDDING_RELAY_ADMIN_SECRET_FILE` | Required admin secret file, at least 32 bytes after trimming |
 
 `make build` produces `bin/pudding-relay` and embeds the Git commit; the version comes from `VERSION`, and `COMMIT` can override commit metadata. `--version` prints it without requiring server configuration. SIGINT/SIGTERM closes tunnels, wakes active streams and shuts down HTTP. The registry is atomically replaced; POSIX systems use file mode `0600` and newly created directory mode `0700`. Windows uses the data directory’s ACL permissions. Back it up securely; lost credentials must be revoked and recreated.
@@ -122,26 +121,13 @@ curl --fail http://127.0.0.1:9623/healthz
 docker compose down
 ```
 
-This source Compose builds the `server` development target, publishes only host loopback, mounts the admin secret as a file and persists digests in `relay_data`. The image runs non-root with a read-only filesystem and dropped capabilities. User installs use the Docker Hub distribution above, which includes browser assets. Set `PUDDING_RELAY_PORT=18080` to change the loopback host port. Do not use `down --volumes` unless intentionally deleting all registrations.
+This source Compose builds the relay image, publishes only host loopback, mounts the admin secret as a file and persists digests in `relay_data`. The image runs non-root with a read-only filesystem and dropped capabilities. User installs use the Docker Hub image above. Set `PUDDING_RELAY_PORT=18080` to change the loopback host port. Do not use `down --volumes` unless intentionally deleting all registrations.
 
 Configure your proxy to reach the Relay HTTP backend. No trusted-proxy CIDRs or custom `/admin/api/` location are required. Desktop/browser pairing still validates the exact configured public origin.
 
 The proxy must support WebSocket upgrade and unbuffered SSE, permit attachment sizes appropriate to your deployment, and avoid logging credential/cookie/body contents. Do not expose the relay's internal HTTP listener to the internet. Provision trusted HTTPS for real phones. Keep the admin secret file outside version control. To rotate it, replace the file and restart the relay. Desktop credentials are independently revoked in admin.
 
-For source development and custom images, use the browser assets from a compatible desktop build. Its package includes matching assets: on macOS, `Pudding.app/Contents/Resources/app/web/dist/remote`; on Windows, `<installation directory>/resources/app/web/dist/remote`. Copy the directory contents into `mobile-dist` to deploy without private source access. Maintainers can also build `web/dist/remote` from the matching desktop source. The published distribution image already bundles these assets; normal installations need no separate asset mount.
-
-To install browser assets in a custom image, mount the shared build read-only and set `PUDDING_RELAY_ASSETS_DIR` to that container path, for example an override:
-
-```yaml
-services:
-  relay:
-    environment:
-      PUDDING_RELAY_ASSETS_DIR: /assets
-    volumes:
-      - ./mobile-dist:/assets:ro
-```
-
-The shared HTML uses `<base href="__PUDDING_REMOTE_BASE__" />`; the relay replaces the marker with `/d/{desktopID}/` and permits that same-origin base in CSP. `/pair` and `/s/{sessionID}` deep links return this HTML, so relative assets resolve under the desktop base. They load while the desktop is offline; business requests return a clear `503`. Without `index.html`, the relay shows an explicit installation page, not a substitute browser client.
+Browser UI deployment belongs to Pudding Desktop. The desktop gateway returns `/`, `/index.html`, `/pair` and `/s/{sessionID}` from its bundled browser build, substitutes the desktop base, and serves relative assets under `/d/{desktopID}/`. Every such request crosses the authenticated tunnel. Relay does not host, rewrite or cache a separate Pudding UI copy.
 
 ## Admin and endpoints
 
@@ -157,8 +143,7 @@ Admin APIs require `Authorization: Bearer <admin secret>` on every operation. Co
 | `POST /admin/api/desktops` | JSON `{"desktopID":"existing-core-id","label":"My desktop"}` → 201 with `desktopID`, `label`, `createdAt`, one-time `token`; duplicate ID → 409 |
 | `DELETE /admin/api/desktops/{desktopID}` | 204, persistent revocation and active tunnel close |
 | `GET /tunnel` | WebSocket protocol v1, authenticated first frame |
-| `/d/{desktopID}/api/*`, `/d/{desktopID}/remote/*` | HTTP forwarded through the registered desktop gateway; offline → 503 |
-| `GET /d/{desktopID}/…` | Installed browser assets; unknown desktop → 404 |
+| `/d/{desktopID}/*` | Forward pages, assets, pairing APIs and business REST/SSE through the registered desktop tunnel; offline → 503 |
 
 The desktop gateway owns browser pairing/login and route authorization. The relay cannot bypass it and cannot proxy arbitrary destinations. Cookies, `Origin`, and `Last-Event-ID` are forwarded; authorization, host, hop-by-hop, forwarded and incoming `X-Pudding-*` headers are stripped. The relay only supplies `X-Pudding-Remote-Mode=relay`. Browser Origin is preserved; the desktop gateway validates pairing and business permissions against its configured relay URL.
 
@@ -178,17 +163,13 @@ Each decoded data chunk is at most 32,768 bytes; JSON frames are at most 65,536 
 
 ## Building a distribution image
 
-Maintainers supply the compiled shared browser directory and its matching notices, neither committed to this repository:
+Build directly from this repository:
 
 ```sh
-WEB_ASSETS_DIR=/path/to/pudding/web/dist/remote \
-WEB_LEGAL_DIR=/path/to/pudding/dist/legal \
 make docker-build
 ```
 
-`VERSION` is the single release-version source, initially `0.1.0`. `make docker-publish` uses the same inputs for Linux amd64/arm64 and creates both `latest` and fixed-version tags. `IMAGE` changes the target image reference. The current Docker user needs push access. `scripts/build-image.sh` checks Pudding's base marker and license files, then supplies binary assets through a named context, excluding private source and source maps.
-
-The standalone Go image builds with `docker build --target server .`; the complete distribution needs the `browser` context. CI UI fixtures only test installation and persistence; they are never published as release assets.
+`VERSION` is the single release-version source. `make docker-publish` publishes Linux amd64/arm64 images under both `latest` and the fixed-version tag. `IMAGE` changes the target reference; the Docker user needs push access. No desktop checkout, browser directory or extra build context is required. `docker build .` builds the same standalone image.
 
 ## Versioning and releases
 
@@ -205,7 +186,7 @@ make release-minor
 make release-major
 ```
 
-Commit source on main and provide the browser assets/notices above and Docker Hub push access. The release script fetches main/tags, runs tests, commits a version bump if needed, pushes the multi-architecture image, then atomically pushes main and Git tag `vX.Y.Z`. The first patch release uses the prepared version; an already tagged current version increments patch. Published versions reject repeat publication. A failed image push creates no Git tag; retry retains the prepared version.
+Commit source on main and provide Docker Hub push access. The release script fetches main/tags, runs tests, commits a version bump if needed, pushes the multi-architecture image, then atomically pushes main and Git tag `vX.Y.Z`. The first patch release uses the prepared version; an already tagged current version increments patch. Published versions reject repeat publication. A failed image push creates no Git tag; retry retains the prepared version.
 
 Install a fixed version:
 
@@ -226,13 +207,15 @@ make test-install
 git diff --check
 ```
 
-`make check` verifies formatting, runs vet and tests with the race detector. Tests cover digest persistence/restart, file permissions, concurrent registration, admin authentication, revoke/disconnect, protocol validation and closed admin CORS, bounded frames/streams, upload, SSE, trusted headers, cancellation, shutdown and browser deep links. CI also builds and smoke-tests the container. Desktop/browser integration requires a compatible gateway and browser build. Real-phone cellular access, sustained multi-device operation and capacity testing remain to be completed; the per-desktop stream limit is not a measured user-capacity figure.
+`make check` verifies formatting, runs vet and tests with the race detector. Tests cover digest persistence/restart, file permissions, concurrent registration, admin authentication, revoke/disconnect, protocol validation and closed admin CORS, bounded frames/streams, upload, SSE, trusted headers, cancellation, shutdown and desktop-owned browser pages/assets, HEAD, cache/security headers, multiple desktop UI versions and desktop-only UI updates. CI also builds and smoke-tests the container. Desktop/browser integration uses the browser build supplied by that desktop. Real-phone cellular access, sustained multi-device operation and capacity testing remain to be completed; the per-desktop stream limit is not a measured user-capacity figure.
 
 ## License
 
 [Apache License 2.0](LICENSE).
 
 ## Upgrading from 0.1.0
+
+Starting with 0.1.6, Relay forwards Pudding pages and assets through the desktop tunnel instead of shipping a browser build. Existing deployments need this one-time relay upgrade; subsequent Pudding UI updates only require updating Pudding. Desktop IDs, relay credentials and browser grants are preserved. Rerun the installer to remove the browser asset environment setting from its Compose template. Custom deployments must remove the old `--assets-dir` option, `PUDDING_RELAY_ASSETS_DIR` environment variable and browser asset mount.
 
 Rerun the installer to remove obsolete `PUBLIC_URL` and Compose environment settings while retaining secrets and registration data; pulling an image alone does not update the old template. Starting with 0.1.3, the installer also removes obsolete `TRUSTED_PROXIES`. After updating the image, remove the custom admin proxy location previously required for nonstandard HTTPS ports. The removed `--public-url`, `--allow-insecure-loopback` and `--trusted-proxies` flags have no compatibility path.
 

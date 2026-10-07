@@ -41,6 +41,10 @@ func testRelay(t *testing.T) (*Relay, *httptest.Server, string) {
 }
 func dialDesktop(t *testing.T, s *httptest.Server, token string) *websocket.Conn {
 	t.Helper()
+	return dialDesktopForID(t, s, "desktop-one", token)
+}
+func dialDesktopForID(t *testing.T, s *httptest.Server, desktopID, token string) *websocket.Conn {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	c, _, err := websocket.Dial(ctx, strings.Replace(s.URL, "http:", "ws:", 1)+"/tunnel", &websocket.DialOptions{Subprotocols: []string{Protocol}})
@@ -49,9 +53,9 @@ func dialDesktop(t *testing.T, s *httptest.Server, token string) *websocket.Conn
 	}
 	c.SetReadLimit(65536)
 	t.Cleanup(func() { _ = c.CloseNow() })
-	writeFrame(t, c, frame{Type: "hello", Protocol: 1, DesktopID: "desktop-one", Token: token})
+	writeFrame(t, c, frame{Type: "hello", Protocol: 1, DesktopID: desktopID, Token: token})
 	f := readFrame(t, c)
-	if f.Type != "hello" || f.Protocol != 1 || f.DesktopID != "desktop-one" {
+	if f.Type != "hello" || f.Protocol != 1 || f.DesktopID != desktopID {
 		t.Fatalf("hello: %#v", f)
 	}
 	return c
@@ -316,28 +320,6 @@ func TestBoundedStreamProtocol(t *testing.T) {
 		t.Fatal("unexpected ack accepted")
 	}
 }
-func TestStaticAssetsAndDeepLinks(t *testing.T) {
-	r, _, _ := testRelay(t)
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("mobile app"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	cfg := r.cfg
-	cfg.AssetsDir = dir
-	relay, h, err := NewRelay(BuildInfo{}, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer relay.Close()
-	for _, path := range []string{"/d/desktop-one/", "/d/desktop-one/pair", "/d/desktop-one/s/session"} {
-		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
-		if w.Code != 200 || w.Body.String() != "mobile app" {
-			t.Fatalf("%s %d %s", path, w.Code, w.Body.String())
-		}
-	}
-}
-
 func TestDesktopStreamLimitAndGracefulClose(t *testing.T) {
 	relay, server, token := testRelay(t)
 	c := dialDesktop(t, server, token)
@@ -389,61 +371,6 @@ func TestOutboundFramesAreBounded(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusRequestHeaderFieldsTooLarge {
 		t.Fatalf("oversize metadata status %d", resp.StatusCode)
-	}
-}
-
-func TestMobileBaseResolvesDeepLinkAssets(t *testing.T) {
-	r, _, _ := testRelay(t)
-	dir := t.TempDir()
-	if err := os.Mkdir(filepath.Join(dir, "assets"), 0700); err != nil {
-		t.Fatal(err)
-	}
-	html := `<!doctype html><base href="__PUDDING_REMOTE_BASE__" /><script src="assets/app.js"></script>`
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte(html), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "assets", "app.js"), []byte("mobile script"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	cfg := r.cfg
-	cfg.AssetsDir = dir
-	relay, h, err := NewRelay(BuildInfo{}, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer relay.Close()
-	server := httptest.NewServer(h)
-	defer server.Close()
-	for _, path := range []string{"/d/desktop-one/", "/d/desktop-one/pair", "/d/desktop-one/s/session", "/d/desktop-one/index.html"} {
-		resp, err := server.Client().Get(server.URL + path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		data, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if resp.StatusCode != 200 || !strings.Contains(string(data), `<base href="/d/desktop-one/" />`) || strings.Contains(string(data), "__PUDDING_REMOTE_BASE__") {
-			t.Fatalf("%s %d %s", path, resp.StatusCode, data)
-		}
-		if !strings.Contains(resp.Header.Get("Content-Security-Policy"), "base-uri 'self'") {
-			t.Fatal("base CSP")
-		}
-		base, err := url.Parse(server.URL + "/d/desktop-one/")
-		if err != nil {
-			t.Fatal(err)
-		}
-		asset, _ := url.Parse("assets/app.js")
-		assetResp, err := server.Client().Get(base.ResolveReference(asset).String())
-		if err != nil {
-			t.Fatal(err)
-		}
-		js, err := io.ReadAll(assetResp.Body)
-		assetResp.Body.Close()
-		if err != nil || assetResp.StatusCode != 200 || string(js) != "mobile script" {
-			t.Fatalf("asset %d %s %v", assetResp.StatusCode, js, err)
-		}
 	}
 }
 
