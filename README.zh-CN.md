@@ -141,7 +141,7 @@ services:
 
 ## Admin 与接口
 
-打开 `/admin`，选择 English 或简体中文，输入管理员密钥。页面仅在内存中保留密钥，退出或关闭页面后清除。标准登录表单支持浏览器密码管理器；是否保存由你选择，并取决于浏览器设置。从 Pudding 远程访问设置复制已有桌面 ID，登记后将仅显示一次的凭据填写到桌面中继设置。不要另造中继桌面 ID。撤销会删除摘要、断开隧道并拒绝后续握手；撤销后重新登记相同 ID 会生成新凭据。
+打开 `/admin`，选择 English 或简体中文，输入管理员密钥。页面仅在内存中保留密钥，退出或关闭页面后清除。标准登录表单支持浏览器密码管理器；是否保存由你选择，并取决于浏览器设置。密码管理器账号标记固定为 `admin@pudding-relay`，与其他服务的通用 `admin` 区分；网站地址由浏览器单独管理。浏览器仍可能建议关联网站的凭据，保存或更新时请确认对应网站和账号。从 Pudding 远程访问设置复制已有桌面 ID，登记后将仅显示一次的凭据填写到桌面中继设置。不要另造中继桌面 ID。撤销会删除摘要、断开隧道并拒绝后续握手；撤销后重新登记相同 ID 会生成新凭据。
 
 每次 Admin API 操作都要求 `Authorization: Bearer <管理员密钥>`；Cookie 不能用于管理员鉴权，不开放跨域预检。Host、Origin 或代理协议改写不会拒绝已正确认证的管理请求。更换代理域名无需重启或修改 Relay；Pudding 桌面端仍需更新连接地址，浏览器在新域名重新配对。响应均为 `Cache-Control: no-store`。
 
@@ -207,7 +207,7 @@ make release-major
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env IMAGE=teatak/pudding-relay:0.1.4 sh
+  | env IMAGE=teatak/pudding-relay:0.1.5 sh
 ```
 
 `latest` 跟随新发行版；固定标签保持该版本，`make upgrade` 沿用安装时选择的镜像。
@@ -232,4 +232,4 @@ git diff --check
 
 重新运行安装命令，让安装器移除已废弃的 `PUBLIC_URL` 和旧 Compose 环境项，并保留密钥与登记数据；只拉取镜像不会更新旧安装模板。从 0.1.3 起，安装器同时移除已废弃的 `TRUSTED_PROXIES`。镜像升级后，可删除此前为非标准 HTTPS 端口添加的自定义管理路径反代配置。`--public-url`、`--allow-insecure-loopback` 和 `--trusted-proxies` 已删除，不保留旧参数路径。
 
-默认服务端口从 `0.1.2` 起统一为 `9623`（Go、容器、健康检查和全新安装）。已有安装的宿主机 `PORT` 会保留；重新运行安装器将 Compose 容器 target 更新为 `9623`。若已有安装使用旧版固定镜像标签，重新运行时显式传入 `IMAGE=teatak/pudding-relay:0.1.4`。
+默认服务端口从 `0.1.2` 起统一为 `9623`（Go、容器、健康检查和全新安装）。已有安装的宿主机 `PORT` 会保留；重新运行安装器将 Compose 容器 target 更新为 `9623`。若已有安装使用旧版固定镜像标签，重新运行时显式传入 `IMAGE=teatak/pudding-relay:0.1.5`。

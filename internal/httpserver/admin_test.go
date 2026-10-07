@@ -40,10 +40,13 @@ func TestAdminPageIsPrivateSelfContainedAndBilingual(t *testing.T) {
 			t.Fatalf("missing translation %s", text)
 		}
 	}
-	for _, marker := range []string{`<form id="login" method="post" action="/admin" autocomplete="on">`, `name="username" autocomplete="username" value="admin"`, `id="secret" name="password" type="password" autocomplete="current-password"`, `id="token" readonly type="password" autocomplete="off"`} {
+	for _, marker := range []string{`<form id="login" method="post" action="/admin" autocomplete="on">`, `name="username" autocomplete="username" value="admin@pudding-relay" readonly hidden`, `id="secret" name="password" type="password" autocomplete="current-password"`, `id="token" readonly type="password" autocomplete="off"`} {
 		if !strings.Contains(page, marker) {
 			t.Fatalf("missing password-manager login metadata: %s", marker)
 		}
+	}
+	if strings.Contains(page, `name="username" autocomplete="username" value="admin"`) {
+		t.Fatal("generic admin identity can collide with sibling services")
 	}
 	for _, unsafe := range []string{token, strings.Repeat("a", 32), "localStorage", "sessionStorage", "<script src="} {
 		if strings.Contains(page, unsafe) {

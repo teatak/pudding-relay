@@ -141,7 +141,7 @@ The shared HTML uses `<base href="__PUDDING_REMOTE_BASE__" />`; the relay replac
 
 ## Admin and endpoints
 
-Open `/admin`, choose English or 简体中文, and enter the admin secret. The page keeps the secret in memory and clears it when you sign out or close the tab. The standard login form supports browser password managers; saving is your choice and depends on browser settings. Copy the desktop's existing ID from Pudding Remote access settings, register it, and copy the one-time credential into the desktop's relay settings. Do not invent a separate relay desktop ID. Revocation removes the stored digest, disconnects the tunnel and rejects future handshakes. Re-registering the same ID after revocation issues a new credential.
+Open `/admin`, choose English or 简体中文, and enter the admin secret. The page keeps the secret in memory and clears it when you sign out or close the tab. The standard login form supports browser password managers; saving is your choice and depends on browser settings. The password-manager account label is `admin@pudding-relay`, distinct from the generic `admin` used by other services; site addresses are managed separately by the browser. Browsers may still suggest credentials from related sites; verify the site/account before saving or updating a record. Copy the desktop's existing ID from Pudding Remote access settings, register it, and copy the one-time credential into the desktop's relay settings. Do not invent a separate relay desktop ID. Revocation removes the stored digest, disconnects the tunnel and rejects future handshakes. Re-registering the same ID after revocation issues a new credential.
 
 Admin APIs require `Authorization: Bearer <admin secret>` on every operation. Cookies cannot authenticate admin; cross-origin preflight is not enabled. Host/Origin/proxy protocol rewriting does not reject a correctly authenticated admin request. Changing the proxy domain needs no Relay restart or configuration update. Pudding Desktop still needs its connection URL updated, and browsers pair again at the new origin. Responses use `Cache-Control: no-store`.
 
@@ -207,7 +207,7 @@ Install a fixed version:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/teatak/pudding-relay/main/install.sh \
-  | env IMAGE=teatak/pudding-relay:0.1.4 sh
+  | env IMAGE=teatak/pudding-relay:0.1.5 sh
 ```
 
 `latest` follows new releases. A fixed tag remains on that version; `make upgrade` keeps the image reference selected at installation.
@@ -232,4 +232,4 @@ git diff --check
 
 Rerun the installer to remove obsolete `PUBLIC_URL` and Compose environment settings while retaining secrets and registration data; pulling an image alone does not update the old template. Starting with 0.1.3, the installer also removes obsolete `TRUSTED_PROXIES`. After updating the image, remove the custom admin proxy location previously required for nonstandard HTTPS ports. The removed `--public-url`, `--allow-insecure-loopback` and `--trusted-proxies` flags have no compatibility path.
 
-Starting with `0.1.2`, the default service port is `9623` across Go, containers, health checks and fresh installations. Existing host `PORT` selections are retained; rerun the installer to update the Compose container target to `9623`. If an installation pins an older image tag, explicitly pass `IMAGE=teatak/pudding-relay:0.1.4` when rerunning.
+Starting with `0.1.2`, the default service port is `9623` across Go, containers, health checks and fresh installations. Existing host `PORT` selections are retained; rerun the installer to update the Compose container target to `9623`. If an installation pins an older image tag, explicitly pass `IMAGE=teatak/pudding-relay:0.1.5` when rerunning.
